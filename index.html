@@ -287,8 +287,8 @@ async function loadData() {
             zeit: (r[5] || '').trim(),
             titel: (r[6] || '').trim(),
             farbe: (r[7] || '#3b2680').trim(),
-            tooltip: (r[8] || '').trim(),
-            deps: (r[9] || '').split(',').map(s => s.trim()).filter(Boolean),
+            deps: (r[8] || '').split(',').map(s => s.trim()).filter(Boolean),
+            tooltip: (r[9] || '').trim(),
         }))
         .filter(r => !isNaN(r.start));
 }
