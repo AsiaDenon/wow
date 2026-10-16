@@ -279,14 +279,14 @@ async function loadData() {
     return rows.slice(1)
         .filter(r => r[0] && r[0].trim())
         .map(r => ({
-            id: r[0].trim(),
-            gruppe: (r[1] || '').trim(),
-            start: parseInt(r[2], 10),
-            end: r[3] ? parseInt(r[3], 10) : null,
-            icon: (r[4] || '').trim(),
-            zeit: (r[5] || '').trim(),
-            titel: (r[6] || '').trim(),
-            farbe: (r[7] || '#3b2680').trim(),
+            gruppe: (r[0] || '').trim(),
+            icon: (r[1] || '').trim(),
+            titel: (r[2] || '').trim(),
+            zeit: (r[3] || '').trim(),
+            start: parseInt(r[4], 10),
+            end: r[5] ? parseInt(r[5], 10) : null,
+            farbe: (r[6] || '#3b2680').trim(),
+            id: (r[7] || '').trim(),
             deps: (r[8] || '').split(',').map(s => s.trim()).filter(Boolean),
             tooltip: (r[9] || '').trim(),
         }))
