@@ -29,62 +29,101 @@
     .subtitle b { color: #c4b5fd; }
 
     .timeline-wrap {
-        width: 100%; max-width: 1600px; margin: 0 auto;
+        width: 100%; max-width: 1200px; margin: 0 auto;
         background: #0f0f1a;
         border: 1px solid #2a2a3e;
         border-radius: 12px;
         box-shadow: 0 8px 32px rgba(0,0,0,0.5);
         overflow: auto;
         position: relative;
-        max-height: 720px;
+        height: 720px;
     }
-    .timeline-wrap::-webkit-scrollbar { height: 14px; width: 12px; }
+    .timeline-wrap::-webkit-scrollbar { width: 12px; height: 12px; }
     .timeline-wrap::-webkit-scrollbar-track {
         background: #1a1a2e; border-radius: 7px;
     }
     .timeline-wrap::-webkit-scrollbar-thumb {
-        background: linear-gradient(90deg, #7c3aed, #2563eb, #16a34a, #ef4444, #8b5cf6);
+        background: linear-gradient(180deg, #7c3aed, #2563eb, #16a34a, #ef4444, #8b5cf6);
         border-radius: 7px; border: 2px solid #1a1a2e;
     }
     .timeline-wrap { scrollbar-color: #7c3aed #1a1a2e; scrollbar-width: auto; }
 
-    .timeline-inner {
+    .timeline-layout {
+        display: flex;
         position: relative;
-        /* width wird dynamisch gesetzt */
+        min-height: 100%;
     }
-    .arrows {
-        position: absolute; top: 0; left: 0;
-        pointer-events: none;
-        z-index: 1;
+
+    /* ---- Vertikale Zeitachse (links, sticky horizontal) ---- */
+    .axis-v {
+        position: sticky;
+        left: 0;
+        width: 100px;
+        flex-shrink: 0;
+        background: #0f0f1a;
+        border-right: 1px solid #2a2a3e;
+        z-index: 20;
+        /* Höhe wird dynamisch gesetzt */
     }
-    .groups-layer {
+    .axis-tick-v {
+        position: absolute;
+        left: 0;
+        width: 100%;
+        padding: 4px 10px 0 8px;
+        font-size: 0.7rem;
+        color: #9ca3af;
+        border-top: 1px dashed #3a3a5e;
+        white-space: nowrap;
+        text-align: right;
+    }
+    .axis-tick-v.timeless {
+        color: #c4b5fd;
+        font-style: italic;
+    }
+
+    /* ---- Canvas mit Gruppen & Items ---- */
+    .canvas-v {
         position: relative;
-        z-index: 2;
+        flex: 1;
+        min-width: 800px;
+        /* Höhe wird dynamisch gesetzt */
     }
-    .group {
-        position: relative;
-    }
-    .group-header {
-        position: sticky; left: 0;
-        display: inline-block;
-        padding: 8px 16px 8px 14px;
-        background: linear-gradient(90deg, rgba(20,20,35,0.98) 0%, rgba(20,20,35,0.85) 80%, transparent 100%);
+
+    /* ---- Gruppen-Header (horizontal, volle Breite) ---- */
+    .group-header-v {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 38px;
+        line-height: 38px;
+        padding: 0 20px;
+        background: linear-gradient(90deg, rgba(124,58,237,0.15) 0%, rgba(124,58,237,0.05) 60%, transparent 100%);
+        border-top: 1px solid rgba(196,181,253,0.25);
+        border-bottom: 1px solid rgba(196,181,253,0.15);
         font-size: 0.95rem;
         font-weight: 600;
         color: #c4b5fd;
-        letter-spacing: 0.5px;
-        z-index: 10;
+        letter-spacing: 1px;
+        z-index: 4;
         pointer-events: none;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
-    .group-body {
-        position: relative;
-        /* height wird dynamisch gesetzt */
+    .group-header-v::before {
+        content: '';
+        position: absolute;
+        left: 0; top: 0; bottom: 0;
+        width: 3px;
+        background: #7c3aed;
     }
-    .item {
+
+    /* ---- Items ---- */
+    .item-v {
         position: absolute;
         background: #3b2680ff;
         border-radius: 6px;
-        padding: 6px 10px;
+        padding: 5px 10px;
         cursor: pointer;
         transition: filter 0.15s, transform 0.1s;
         display: flex;
@@ -93,19 +132,21 @@
         user-select: text;
         border-left: 3px solid #e91e8c;
         overflow: hidden;
+        z-index: 3;
     }
-    .item:hover {
+    .item-v:hover {
         filter: brightness(1.2);
         transform: translateY(-1px);
+        z-index: 6;
     }
-    .item .item-zeit {
-        font-size: 0.7rem;
+    .item-v .item-zeit {
+        font-size: 0.65rem;
         color: rgba(255,255,255,0.75);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    .item .item-titel {
+    .item-v .item-titel {
         font-size: 0.82rem;
         font-weight: 600;
         color: #ffffff;
@@ -114,6 +155,16 @@
         text-overflow: ellipsis;
     }
 
+    /* ---- Pfeile ---- */
+    .arrows-v {
+        position: absolute;
+        top: 0; left: 0;
+        pointer-events: none;
+        z-index: 1;
+        width: 100%;
+    }
+
+    /* ---- Tooltip & Toast ---- */
     .tooltip {
         position: fixed;
         background: rgba(20, 20, 35, 0.97);
@@ -158,25 +209,6 @@
         margin-top: 12px; min-height: 20px;
     }
     .status.error { color: #ef4444; }
-
-    /* Zeitachse */
-    .axis {
-        position: sticky; bottom: 0; left: 0;
-        height: 40px;
-        background: linear-gradient(180deg, transparent 0%, rgba(15,15,26,0.95) 40%, #0f0f1a 100%);
-        pointer-events: none;
-        z-index: 5;
-    }
-    .axis-tick {
-        position: absolute;
-        top: 12px;
-        height: 28px;
-        border-left: 1px dashed #3a3a5e;
-        font-size: 0.72rem;
-        color: #9ca3af;
-        padding-left: 4px;
-        white-space: nowrap;
-    }
 </style>
 </head>
 <body>
@@ -187,9 +219,13 @@
 </p>
 
 <div class="timeline-wrap" id="timelineWrap">
-    <div class="timeline-inner" id="timelineInner">
-        <svg class="arrows" id="arrows"></svg>
-        <div class="groups-layer" id="groupsLayer"></div>
+    <div class="timeline-layout" id="timelineLayout">
+        <div class="axis-v" id="axisV"></div>
+        <div class="canvas-v" id="canvasV">
+            <svg class="arrows-v" id="arrowsV"></svg>
+            <div id="sectionsLayer"></div>
+            <div id="itemsLayer"></div>
+        </div>
     </div>
 </div>
 
@@ -205,39 +241,33 @@
 const CONFIG = {
     sheetUrl: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRGtORIe7TdQLBiXK6qmWcoC-z-ixoYzMOwySVpKdj0mHxRtH769Hl_HNz6FCdL4u5NMLUPJcfQ3EvZ/pub?output=csv',
 
-    pxPerYear: 0.55,
-    rowHeight: 46,
-    rowGap: 4,
-    groupHeaderHeight: 36,
-    groupPaddingBottom: 12,
-    minItemWidth: 130,
+    pxPerYear: 0.55,           // Höhe pro Jahr
+    minItemHeight: 44,         // Mindesthöhe eines Items
+    columnWidth: 240,          // Breite eines Items
+    columnGap: 12,             // Abstand zwischen Sub-Spalten
+    canvasPaddingTop: 30,      // Platz oben
+    canvasPaddingBottom: 60,   // Platz unten
+    groupHeaderHeight: 38,     // Höhe des Gruppen-Headers
+    groupHeaderPadding: 20,    // Abstand zwischen Header und erstem Item
     timelessThreshold: -11500,
     tickInterval: 500,
 };
 
 // ============================================================
-// PFEIL-FARBEN – alternierend grau/beige für Kreuzungen
+// PFEIL-FARBEN
 // ============================================================
 const ARROW_COLORS = [
-    '#8a8a8a', // grau
-    '#d4c5a0', // helles beige
-    '#a8a8a8', // helleres grau
-    '#c9b896', // beige
-    '#b0b0b0', // grau
-    '#b8a880', // warmes beige
-    '#7a7a7a', // dunkelgrau
-    '#e0d5b8', // sehr helles beige
-    '#9a9a9a', // grau
-    '#cfc1a0', // beige
+    '#8a8a8a', '#d4c5a0', '#a8a8a8', '#c9b896', '#b0b0b0',
+    '#b8a880', '#7a7a7a', '#e0d5b8', '#9a9a9a', '#cfc1a0',
 ];
 
 // ============================================================
 // DEMO-DATEN
 // ============================================================
 const DEMO_DATA = [
-    { id:'licht', gruppe:'🌌 ZEITLOS', start:-12100, end:-12000, icon:'🌌', zeit:'Zeitlos', titel:'Licht und Leere', farbe:'#7c3aed', tooltip:'<b>🌌 Licht und Leere</b><br><i>Zeitlos – vor aller Zeit</i><br><br>Vor aller Zeit existierten nur zwei Urkräfte.', deps:['naaru','alte_goetter'] },
-    { id:'naaru', gruppe:'🌌 ZEITLOS', start:-11900, end:-11800, icon:'✨', zeit:'Zeitlos', titel:'Die Naaru', farbe:'#2563eb', tooltip:'<b>✨ Die Naaru</b><br><i>Zeitlos</i><br><br>Wesen des reinen Lichts.', deps:['titanen'] },
-    { id:'alte_goetter', gruppe:'🌌 ZEITLOS', start:-11700, end:-11600, icon:'🔮', zeit:'Zeitlos', titel:'Die Alten Götter', farbe:'#dc2626', tooltip:'<b>🔮 Die Alten Götter</b><br><i>Zeitlos</i><br><br>Diener der Leere.', deps:['titanen','loken'] },
+    { id:'licht', gruppe:'🌌 ZEITLOS', start:-12100, end:-12000, icon:'🌌', zeit:'Zeitlos', titel:'Licht und Leere', farbe:'#7c3aed', tooltip:'<b>🌌 Licht und Leere</b>', deps:['naaru','alte_goetter'] },
+    { id:'naaru', gruppe:'🌌 ZEITLOS', start:-11900, end:-11800, icon:'✨', zeit:'Zeitlos', titel:'Die Naaru', farbe:'#2563eb', tooltip:'<b>✨ Die Naaru</b>', deps:['titanen'] },
+    { id:'alte_goetter', gruppe:'🌌 ZEITLOS', start:-11700, end:-11600, icon:'🔮', zeit:'Zeitlos', titel:'Die Alten Götter', farbe:'#dc2626', tooltip:'<b>🔮 Die Alten Götter</b>', deps:['titanen','loken'] },
     { id:'titanen', gruppe:'⚡ Kosmische Urzeit', start:-10000, end:-9900, icon:'⚡', zeit:'~10.000 BDP', titel:'Die Titanen', farbe:'#d97706', tooltip:'<b>⚡ Die Titanen</b>', deps:['sargeras','nachtelfen'] },
     { id:'sargeras', gruppe:'⚡ Kosmische Urzeit', start:-9500, end:-9400, icon:'🔥', zeit:'~9.500 BDP', titel:'Sargeras fällt', farbe:'#16a34a', tooltip:'<b>🔥 Sargeras fällt</b>', deps:['legion'] },
     { id:'loken', gruppe:'⚡ Kosmische Urzeit', start:-9000, end:-8900, icon:'🗡️', zeit:'~9.000 BDP', titel:'Loken verrät Thorim', farbe:'#b91c1c', tooltip:'<b>🗡️ Loken verrät Thorim</b>', deps:['arthas'] },
@@ -280,10 +310,7 @@ function parseCSV(text) {
 // DATEN LADEN
 // ============================================================
 async function loadData() {
-    if (!CONFIG.sheetUrl) {
-        console.log('Keine Sheet-URL gesetzt – Demo-Daten.');
-        return DEMO_DATA;
-    }
+    if (!CONFIG.sheetUrl) return DEMO_DATA;
     const res = await fetch(CONFIG.sheetUrl);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const csv = await res.text();
@@ -313,17 +340,50 @@ async function loadData() {
 function render(data) {
     const startYear = Math.min(...data.map(d => d.start));
     const endYear   = Math.max(...data.map(d => d.end || d.start));
-    const rangeStart = Math.floor(startYear / 500) * 500 - 200;
-    const rangeEnd   = Math.ceil(endYear / 500) * 500 + 200;
+    const rangeStart = Math.floor((startYear - 400) / 500) * 500;
+    const rangeEnd   = Math.ceil((endYear + 300) / 500) * 500;
     const totalYears = rangeEnd - rangeStart;
-    const innerWidth = totalYears * CONFIG.pxPerYear;
 
-    const inner = document.getElementById('timelineInner');
-    inner.style.width = innerWidth + 'px';
+    const axisV = document.getElementById('axisV');
+    const canvasV = document.getElementById('canvasV');
+    const arrowsV = document.getElementById('arrowsV');
+    const sectionsLayer = document.getElementById('sectionsLayer');
+    const itemsLayer = document.getElementById('itemsLayer');
 
-    const groupsLayer = document.getElementById('groupsLayer');
-    const arrowsLayer = document.getElementById('arrows');
-    groupsLayer.innerHTML = '';
+    axisV.innerHTML = '';
+    sectionsLayer.innerHTML = '';
+    itemsLayer.innerHTML = '';
+    arrowsV.innerHTML = '';
+
+    // Höhe berechnen
+    const rangeHeight = totalYears * CONFIG.pxPerYear;
+    const totalHeight = rangeHeight + CONFIG.canvasPaddingTop + CONFIG.canvasPaddingBottom;
+
+    axisV.style.height = totalHeight + 'px';
+    canvasV.style.height = totalHeight + 'px';
+    arrowsV.setAttribute('height', totalHeight);
+    arrowsV.setAttribute('viewBox', `0 0 800 ${totalHeight}`);
+    arrowsV.style.height = totalHeight + 'px';
+
+    // Achse
+    for (let y = rangeStart; y <= rangeEnd; y += CONFIG.tickInterval) {
+        const yPos = CONFIG.canvasPaddingTop + (y - rangeStart) * CONFIG.pxPerYear;
+        const tick = document.createElement('div');
+        tick.className = 'axis-tick-v';
+
+        const isTimeless = y < CONFIG.timelessThreshold;
+        if (isTimeless) {
+            tick.classList.add('timeless');
+            tick.textContent = 'Zeitlos';
+        } else if (y < 0) {
+            tick.textContent = Math.abs(y) + ' BDP';
+        } else {
+            tick.textContent = y + ' ADP';
+        }
+
+        tick.style.top = yPos + 'px';
+        axisV.appendChild(tick);
+    }
 
     // Gruppen in Reihenfolge
     const groupOrder = [];
@@ -336,218 +396,158 @@ function render(data) {
         groupMap[item.gruppe].push(item);
     }
 
-    let yCursor = 0;
-
-    for (const groupName of groupOrder) {
-        const items = groupMap[groupName];
-        const isTimeless = groupName.toLowerCase().includes('zeitlos');
-
-        const groupDiv = document.createElement('div');
-        groupDiv.className = 'group';
-
-        const header = document.createElement('div');
-        header.className = 'group-header';
-        header.textContent = groupName;
-        groupDiv.appendChild(header);
-
-        const body = document.createElement('div');
-        body.className = 'group-body';
-        groupDiv.appendChild(body);
-
-        yCursor += CONFIG.groupHeaderHeight;
-
-        const sorted = [...items].sort((a, b) => a.start - b.start);
-
-        // Zeitlos-Anker-X: alle Items an dieselbe X-Position
-        let timelessX = null;
-        if (isTimeless && sorted.length > 0) {
-            timelessX = (sorted[0].start - rangeStart) * CONFIG.pxPerYear;
-        }
-
-        const rows = [];
-
-        for (const item of sorted) {
-            let x, w;
-            if (isTimeless && timelessX !== null) {
-                x = timelessX;
-                w = CONFIG.minItemWidth;
-            } else {
-                const xStart = (item.start - rangeStart) * CONFIG.pxPerYear;
-                const xEndRaw = ((item.end || item.start) - rangeStart) * CONFIG.pxPerYear;
-                const naturalW = xEndRaw - xStart;
-                w = Math.max(naturalW, CONFIG.minItemWidth);
-                x = xStart;
-            }
-
-            // Erste freie Reihe finden
-            let rowIdx = 0;
-            for (; rowIdx < rows.length; rowIdx++) {
-                if (rows[rowIdx] + 8 <= x) break;
-            }
-            if (rowIdx === rows.length) rows.push(0);
-            rows[rowIdx] = x + w;
-
-            const itemY = rowIdx * (CONFIG.rowHeight + CONFIG.rowGap);
-
-            const el = document.createElement('div');
-            el.className = 'item';
-            el.style.left = x + 'px';
-            el.style.top = itemY + 'px';
-            el.style.width = w + 'px';
-            el.style.height = CONFIG.rowHeight + 'px';
-            el.style.background = item.farbe;
-            el.dataset.id = item.id;
-
-            el.innerHTML =
-                '<div class="item-zeit">' + escapeHtml(item.icon + ' ' + item.zeit) + '</div>' +
-                '<div class="item-titel">' + escapeHtml(item.titel) + '</div>';
-
-            body.appendChild(el);
-        }
-
-        const rowsHeight = rows.length * (CONFIG.rowHeight + CONFIG.rowGap);
-        body.style.height = rowsHeight + 'px';
-        yCursor += rowsHeight + CONFIG.groupPaddingBottom;
-
-        groupsLayer.appendChild(groupDiv);
+    // ──────────────────────────────────────────────────
+    // Y-Position jedes Items berechnen
+    // ──────────────────────────────────────────────────
+    const sorted = [...data].sort((a, b) => a.start - b.start);
+    const itemY = {};   // id -> {y, h}
+    for (const item of sorted) {
+        const y = CONFIG.canvasPaddingTop + (item.start - rangeStart) * CONFIG.pxPerYear;
+        const h = Math.max(((item.end || item.start) - item.start) * CONFIG.pxPerYear, CONFIG.minItemHeight);
+        itemY[item.id] = { y, h };
     }
 
-    const totalHeight = yCursor + 40;
-    inner.style.height = totalHeight + 'px';
+    // ──────────────────────────────────────────────────
+    // Gruppen-Header positionieren (jeweils über dem ersten Item der Gruppe)
+    // ──────────────────────────────────────────────────
+    const groupHeaderY = {};
+    let lastBottom = 0;
 
-    // SVG-Größe setzen
-    arrowsLayer.setAttribute('width', innerWidth);
-    arrowsLayer.setAttribute('height', totalHeight);
-    arrowsLayer.setAttribute('viewBox', `0 0 ${innerWidth} ${totalHeight}`);
-    arrowsLayer.style.width = innerWidth + 'px';
-    arrowsLayer.style.height = totalHeight + 'px';
-    arrowsLayer.innerHTML = '';
+    for (const groupName of groupOrder) {
+        const items = groupMap[groupName].slice().sort((a, b) => a.start - b.start);
+        const firstItem = items[0];
+        let headerY = itemY[firstItem.id].y - CONFIG.groupHeaderHeight - 8;
 
-    // Pfeile zeichnen (nach dem DOM-Render, damit echte Positionen bekannt sind)
-    requestAnimationFrame(() => {
-        drawArrows(data);
-        drawAxis(rangeStart, rangeEnd, innerWidth);
-        attachInteractions(data);
-    });
-}
+        // Nicht mit vorheriger Gruppe überlappen
+        if (headerY < lastBottom + 4) {
+            headerY = lastBottom + 4;
+        }
+        groupHeaderY[groupName] = headerY;
 
-// ============================================================
-// PFEILE – echte DOM-Positionen + farbige Linien
-// ============================================================
-function drawArrows(data) {
-    const svg = document.getElementById('arrows');
-    const inner = document.getElementById('timelineInner');
-    const innerRect = inner.getBoundingClientRect();
+        const headerEl = document.createElement('div');
+        headerEl.className = 'group-header-v';
+        headerEl.style.top = headerY + 'px';
+        headerEl.textContent = groupName;
+        sectionsLayer.appendChild(headerEl);
 
-    // Positionen aus dem DOM ermitteln
-    const positions = {};
-    document.querySelectorAll('.item').forEach(el => {
-        const r = el.getBoundingClientRect();
-        positions[el.dataset.id] = {
-            x: r.left - innerRect.left,
-            y: r.top - innerRect.top,
-            w: r.width,
-            h: r.height,
-            item: data.find(d => d.id === el.dataset.id)
-        };
-    });
+        // Letzte Item-Unterkante der Gruppe finden
+        let groupBottom = headerY + CONFIG.groupHeaderHeight + CONFIG.groupHeaderPadding;
+        for (const item of items) {
+            const b = itemY[item.id].y + itemY[item.id].h;
+            if (b > groupBottom) groupBottom = b;
+        }
+        lastBottom = groupBottom;
+    }
 
+    // ──────────────────────────────────────────────────
+    // Sub-Spalten (Overlap-Vermeidung)
+    // ──────────────────────────────────────────────────
+    const columnEnds = [];
+    const itemColumn = {};
+    for (const item of sorted) {
+        const { y, h } = itemY[item.id];
+        let col = 0;
+        for (; col < columnEnds.length; col++) {
+            if (columnEnds[col] + 6 <= y) break;
+        }
+        if (col === columnEnds.length) columnEnds.push(0);
+        columnEnds[col] = y + h;
+        itemColumn[item.id] = col;
+    }
+
+    const canvasWidth = Math.max(
+        CONFIG.columnWidth * columnEnds.length + CONFIG.columnGap * (columnEnds.length - 1) + 60,
+        800
+    );
+    canvasV.style.minWidth = canvasWidth + 'px';
+    arrowsV.setAttribute('width', canvasWidth);
+    arrowsV.setAttribute('viewBox', `0 0 ${canvasWidth} ${totalHeight}`);
+
+    const itemX = {};
+    for (const item of sorted) {
+        const col = itemColumn[item.id];
+        itemX[item.id] = 30 + col * (CONFIG.columnWidth + CONFIG.columnGap);
+    }
+
+    // ──────────────────────────────────────────────────
+    // Items zeichnen
+    // ──────────────────────────────────────────────────
+    const itemPositions = {};
+    for (const item of sorted) {
+        const { y, h } = itemY[item.id];
+        const x = itemX[item.id];
+        const w = CONFIG.columnWidth;
+
+        const el = document.createElement('div');
+        el.className = 'item-v';
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        el.style.width = w + 'px';
+        el.style.height = h + 'px';
+        el.style.background = item.farbe;
+        el.dataset.id = item.id;
+
+        el.innerHTML =
+            '<div class="item-zeit">' + escapeHtml(item.icon + ' ' + item.zeit) + '</div>' +
+            '<div class="item-titel">' + escapeHtml(item.titel) + '</div>';
+
+        itemsLayer.appendChild(el);
+
+        itemPositions[item.id] = { x, y, w, h, item };
+    }
+
+    // ──────────────────────────────────────────────────
+    // Pfeile zeichnen
+    // ──────────────────────────────────────────────────
     let arrowIndex = 0;
-
-    for (const id in positions) {
-        const src = positions[id];
-        const item = src.item;
-        if (!item) continue;
-
-        for (const targetId of item.deps) {
-            const dst = positions[targetId];
+    for (const id in itemPositions) {
+        const src = itemPositions[id];
+        for (const targetId of src.item.deps) {
+            const dst = itemPositions[targetId];
             if (!dst) continue;
 
             const color = ARROW_COLORS[arrowIndex % ARROW_COLORS.length];
             arrowIndex++;
 
-            const x1 = src.x + src.w;
-            const y1 = src.y + src.h / 2;
-            const x2 = dst.x;
-            const y2 = dst.y + dst.h / 2;
+            // Von Unterkante Quelle → Oberkante Ziel
+            const x1 = src.x + src.w / 2;
+            const y1 = src.y + src.h;
+            const x2 = dst.x + dst.w / 2;
+            const y2 = dst.y;
 
-            const dx = x2 - x1;
             const dy = y2 - y1;
-            let path;
+            let pathD;
 
-            if (Math.abs(dx) < 30 && Math.abs(dy) > 20) {
-                // Vertikal: von unten nach oben
-                const sx = src.x + src.w / 2;
-                const sy = src.y + src.h;
-                const tx = dst.x + dst.w / 2;
-                const ty = dst.y;
-                path = `M ${sx} ${sy} C ${sx} ${sy + 20}, ${tx} ${ty - 20}, ${tx} ${ty}`;
-                drawArrowPath(svg, path, color, tx, ty, 'up');
-            } else if (dx > 20) {
-                // Vorwärts
-                const cx = x1 + dx * 0.5;
-                path = `M ${x1} ${y1} C ${cx} ${y1}, ${cx} ${y2}, ${x2} ${y2}`;
-                drawArrowPath(svg, path, color, x2, y2, 'right');
+            if (dy > 10) {
+                // Nach unten – Kurve
+                const cy = y1 + dy * 0.5;
+                pathD = `M ${x1} ${y1} C ${x1} ${cy}, ${x2} ${cy}, ${x2} ${y2}`;
             } else {
-                // Rückwärts / überlappend
-                const midY = Math.max(src.y + src.h, dst.y + dst.h) + 25;
-                path = `M ${x1} ${y1} Q ${(x1+x2)/2} ${midY}, ${x2} ${y2}`;
-                drawArrowPath(svg, path, color, x2, y2, 'right');
+                // Rückwärts / gleiche Höhe – Bogen
+                const midX = (x1 + x2) / 2 + (x2 > x1 ? 60 : -60);
+                pathD = `M ${x1} ${y1} Q ${midX} ${(y1 + y2) / 2 + 30}, ${x2} ${y2}`;
             }
+
+            const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            p.setAttribute('d', pathD);
+            p.setAttribute('fill', 'none');
+            p.setAttribute('stroke', color);
+            p.setAttribute('stroke-width', '1.6');
+            p.setAttribute('stroke-linecap', 'round');
+            arrowsV.appendChild(p);
+
+            // Pfeilspitze (zeigt nach unten)
+            const size = 7;
+            const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+            arrow.setAttribute('points',
+                `${x2},${y2} ${x2 - size/2},${y2 - size} ${x2 + size/2},${y2 - size}`);
+            arrow.setAttribute('fill', color);
+            arrowsV.appendChild(arrow);
         }
     }
-}
 
-function drawArrowPath(svg, pathD, color, ax, ay, direction) {
-    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    p.setAttribute('d', pathD);
-    p.setAttribute('fill', 'none');
-    p.setAttribute('stroke', color);
-    p.setAttribute('stroke-width', '1.6');
-    p.setAttribute('stroke-linecap', 'round');
-    svg.appendChild(p);
-
-    // Pfeilspitze
-    const size = 6;
-    let points;
-    if (direction === 'up') {
-        points = `${ax},${ay} ${ax - size/2},${ay + size} ${ax + size/2},${ay + size}`;
-    } else {
-        points = `${ax},${ay} ${ax - size},${ay - size/2} ${ax - size},${ay + size/2}`;
-    }
-    const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-    arrow.setAttribute('points', points);
-    arrow.setAttribute('fill', color);
-    svg.appendChild(arrow);
-}
-
-// ============================================================
-// ZEITACHSE
-// ============================================================
-function drawAxis(rangeStart, rangeEnd, innerWidth) {
-    const old = document.querySelector('.axis');
-    if (old) old.remove();
-
-    const axis = document.createElement('div');
-    axis.className = 'axis';
-    axis.style.width = innerWidth + 'px';
-
-    for (let y = rangeStart; y <= rangeEnd; y += CONFIG.tickInterval) {
-        const x = (y - rangeStart) * CONFIG.pxPerYear;
-        const tick = document.createElement('div');
-        tick.className = 'axis-tick';
-        tick.style.left = x + 'px';
-
-        let label;
-        if (y < CONFIG.timelessThreshold) label = 'Zeitlos';
-        else if (y < 0) label = Math.abs(y) + ' BDP';
-        else label = y + ' ADP';
-
-        tick.textContent = label;
-        axis.appendChild(tick);
-    }
-
-    document.getElementById('timelineInner').appendChild(axis);
+    // Interaktion
+    attachInteractions(data);
 }
 
 // ============================================================
@@ -556,7 +556,7 @@ function drawAxis(rangeStart, rangeEnd, innerWidth) {
 function attachInteractions(data) {
     const tooltip = document.getElementById('tooltip');
 
-    document.querySelectorAll('.item').forEach(el => {
+    document.querySelectorAll('.item-v').forEach(el => {
         el.addEventListener('mouseenter', (e) => {
             const id = el.dataset.id;
             const item = data.find(d => d.id === id);
