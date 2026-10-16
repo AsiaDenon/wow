@@ -28,20 +28,13 @@
     }
     .subtitle b { color: #c4b5fd; }
 
-    .status {
-        text-align: center; color: #c4b5fd; font-size: 0.85rem;
-        margin-bottom: 12px; min-height: 20px;
-    }
-    .status.error { color: #ef4444; }
-
     .timeline-wrap {
         width: 100%; max-width: 1600px; margin: 0 auto;
         background: #0f0f1a;
         border: 1px solid #2a2a3e;
         border-radius: 12px;
         box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-        overflow-x: auto;
-        overflow-y: hidden;
+        overflow: auto;
         position: relative;
         max-height: 720px;
     }
@@ -160,6 +153,12 @@
         transform: translateX(-50%) translateY(0);
     }
 
+    .status {
+        text-align: center; color: #c4b5fd; font-size: 0.85rem;
+        margin-top: 12px; min-height: 20px;
+    }
+    .status.error { color: #ef4444; }
+
     /* Zeitachse */
     .axis {
         position: sticky; bottom: 0; left: 0;
@@ -187,14 +186,14 @@
     <b>BDP</b> = Before Dark Portal (vor dem Dunklen Portal) · <b>ADP</b> = After Dark Portal (nach dem Dunklen Portal)
 </p>
 
-<div class="status" id="status">Lade Daten…</div>
-
 <div class="timeline-wrap" id="timelineWrap">
     <div class="timeline-inner" id="timelineInner">
         <svg class="arrows" id="arrows"></svg>
         <div class="groups-layer" id="groupsLayer"></div>
     </div>
 </div>
+
+<div class="status" id="status">Lade Daten…</div>
 
 <div class="tooltip" id="tooltip"></div>
 <div class="toast" id="toast"></div>
@@ -204,41 +203,56 @@
 // KONFIGURATION
 // ============================================================
 const CONFIG = {
-    // ⬇ HIER DEINE GOOGLE-SHEET-CSV-URL EINTRAGEN
     sheetUrl: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRGtORIe7TdQLBiXK6qmWcoC-z-ixoYzMOwySVpKdj0mHxRtH769Hl_HNz6FCdL4u5NMLUPJcfQ3EvZ/pub?output=csv',
 
-    pxPerYear: 0.55,          // Breite pro Jahr in Pixel
-    rowHeight: 46,            // Höhe eines Items
-    rowGap: 4,                // Abstand zwischen zwei Reihen
+    pxPerYear: 0.55,
+    rowHeight: 46,
+    rowGap: 4,
     groupHeaderHeight: 36,
     groupPaddingBottom: 12,
-    minItemWidth: 130,        // Mindestbreite für kurze Labels
-    timelessThreshold: -11500,// Bis zu welchem Jahr die Achse "Zeitlos" zeigt
-    tickInterval: 500,        // Jahre zwischen Achsen-Markierungen
+    minItemWidth: 130,
+    timelessThreshold: -11500,
+    tickInterval: 500,
 };
 
 // ============================================================
-// DEMO-DATEN (falls keine Sheet-URL gesetzt ist)
+// PFEIL-FARBEN – alternierend grau/beige für Kreuzungen
 // ============================================================
-const DEMO_DATA = [
-    { id:'licht',        gruppe:'🌌 ZEITLOS',          start:-12100, end:-12000, icon:'🌌', zeit:'Zeitlos',           titel:'Licht und Leere',       farbe:'#7c3aed', tooltip:'<b>🌌 Licht und Leere</b><br><i>Zeitlos – vor aller Zeit</i><br><br>Vor aller Zeit existierten nur zwei Urkräfte: das <b>Licht</b> und die <b>Leere</b>.<br><br>❌ Kein Volk hat Kenntnis darüber.', deps:['naaru','alte_goetter'] },
-    { id:'naaru',        gruppe:'🌌 ZEITLOS',          start:-11900, end:-11800, icon:'✨', zeit:'Zeitlos',           titel:'Die Naaru',             farbe:'#2563eb', tooltip:'<b>✨ Die Naaru</b><br><i>Zeitlos</i><br><br>Wesen des reinen Lichts.<br><br>💡 Die <b>Draenei</b> verehren sie.', deps:['titanen'] },
-    { id:'alte_goetter', gruppe:'🌌 ZEITLOS',          start:-11700, end:-11600, icon:'🔮', zeit:'Zeitlos',           titel:'Die Alten Götter',      farbe:'#dc2626', tooltip:'<b>🔮 Die Alten Götter</b><br><i>Zeitlos</i><br><br>Diener der Leere.<br><br>💡 Nur Wenige wissen von ihnen.', deps:['titanen','loken'] },
-    { id:'titanen',      gruppe:'⚡ Kosmische Urzeit',  start:-10000, end:-9900,  icon:'⚡', zeit:'~10.000 BDP',       titel:'Die Titanen',           farbe:'#d97706', tooltip:'<b>⚡ Die Titanen</b><br><i>~10.000 BDP</i><br><br>Riesenhafte Ordnungswesen.<br><br>💡 Zwerge, Magier & Drachen kennen sie.', deps:['sargeras','nachtelfen'] },
-    { id:'sargeras',     gruppe:'⚡ Kosmische Urzeit',  start:-9500,  end:-9400,  icon:'🔥', zeit:'~9.500 BDP',        titel:'Sargeras fällt',        farbe:'#16a34a', tooltip:'<b>🔥 Sargeras fällt</b><br><i>~9.500 BDP</i><br><br>Der mächtigste Titan fällt der Leere anheim.<br><br>💡 Nur Dämonen und Titanen wissen davon.', deps:['legion'] },
-    { id:'loken',        gruppe:'⚡ Kosmische Urzeit',  start:-9000,  end:-8900,  icon:'🗡️', zeit:'~9.000 BDP',        titel:'Loken verrät Thorim',   farbe:'#b91c1c', tooltip:'<b>🗡️ Loken verrät Thorim</b><br><i>~9.000 BDP</i><br><br>Loken wird von Yogg-Saron korrumpiert.<br><br>💡 Nur die Titanen-Wächter wissen davon.', deps:['arthas'] },
-    { id:'legion',       gruppe:'⚔️ Antike',            start:-8000,  end:-7900,  icon:'💀', zeit:'~8.000 BDP',        titel:'Brennende Legion',      farbe:'#15803d', tooltip:'<b>💀 Brennende Legion</b><br><i>~8.000 BDP</i><br><br>Sargeras\' dämonische Armee.', deps:['krieg_antike'] },
-    { id:'nachtelfen',   gruppe:'⚔️ Antike',            start:-7800,  end:-7700,  icon:'🌙', zeit:'~7.800 BDP',        titel:'Die ersten Nachtelfen', farbe:'#9333ea', tooltip:'<b>🌙 Die ersten Nachtelfen</b><br><i>~7.800 BDP</i><br><br>Sie entstehen am Brunnen der Ewigkeit.', deps:['brunnen'] },
-    { id:'brunnen',      gruppe:'⚔️ Antike',            start:-7600,  end:-7500,  icon:'💧', zeit:'~7.600 BDP',        titel:'Brunnen der Ewigkeit',  farbe:'#06b6d4', tooltip:'<b>💧 Brunnen der Ewigkeit</b><br><i>~7.600 BDP</i><br><br>Die Quelle aller Magie auf Azeroth.', deps:['krieg_antike'] },
-    { id:'krieg_antike', gruppe:'⚔️ Antike',            start:-7400,  end:-7000,  icon:'⚔️', zeit:'~7.400 BDP',        titel:'Krieg der Antike',      farbe:'#a855f7', tooltip:'<b>⚔️ Krieg der Antike</b><br><i>~7.400 BDP</i><br><br>Die Nachtelfen stellen sich der Brennenden Legion.', deps:['sundbrunnen','kaldorei'] },
-    { id:'sundbrunnen',  gruppe:'⚔️ Antike',            start:-7000,  end:-6900,  icon:'☀️', zeit:'~7.000 BDP',        titel:'Sonnenbrunnen',         farbe:'#f59e0b', tooltip:'<b>☀️ Sonnenbrunnen</b><br><i>~7.000 BDP</i><br><br>Quelle der Blutelfen-Magie.', deps:['illidan'] },
-    { id:'kaldorei',     gruppe:'💀 Moderne',           start:-4000,  end:-3900,  icon:'🌲', zeit:'~4.000 BDP',        titel:'Kaldorei-Reich',        farbe:'#10b981', tooltip:'<b>🌲 Kaldorei-Reich</b><br><i>~4.000 BDP</i><br><br>Das Nachtelfenreich erblüht.', deps:['illidan'] },
-    { id:'arthas',       gruppe:'💀 Moderne',           start:20,     end:21,     icon:'💀', zeit:'20 ADP',            titel:'Arthas wird Lichkönig', farbe:'#ef4444', tooltip:'<b>💀 Arthas wird Lichkönig</b><br><i>20 ADP</i><br><br>Der Prinz fällt der Geißel anheim.', deps:['illidan'] },
-    { id:'illidan',      gruppe:'💀 Moderne',           start:21,     end:22,     icon:'👁️', zeit:'21 ADP',            titel:'Illidan erwacht',       farbe:'#8b5cf6', tooltip:'<b>👁️ Illidan erwacht</b><br><i>21 ADP</i><br><br>Der Verräter kehrt zurück.', deps:[] },
+const ARROW_COLORS = [
+    '#8a8a8a', // grau
+    '#d4c5a0', // helles beige
+    '#a8a8a8', // helleres grau
+    '#c9b896', // beige
+    '#b0b0b0', // grau
+    '#b8a880', // warmes beige
+    '#7a7a7a', // dunkelgrau
+    '#e0d5b8', // sehr helles beige
+    '#9a9a9a', // grau
+    '#cfc1a0', // beige
 ];
 
 // ============================================================
-// CSV-PARSER (einfacher RFC-4180-Parser)
+// DEMO-DATEN
+// ============================================================
+const DEMO_DATA = [
+    { id:'licht', gruppe:'🌌 ZEITLOS', start:-12100, end:-12000, icon:'🌌', zeit:'Zeitlos', titel:'Licht und Leere', farbe:'#7c3aed', tooltip:'<b>🌌 Licht und Leere</b><br><i>Zeitlos – vor aller Zeit</i><br><br>Vor aller Zeit existierten nur zwei Urkräfte.', deps:['naaru','alte_goetter'] },
+    { id:'naaru', gruppe:'🌌 ZEITLOS', start:-11900, end:-11800, icon:'✨', zeit:'Zeitlos', titel:'Die Naaru', farbe:'#2563eb', tooltip:'<b>✨ Die Naaru</b><br><i>Zeitlos</i><br><br>Wesen des reinen Lichts.', deps:['titanen'] },
+    { id:'alte_goetter', gruppe:'🌌 ZEITLOS', start:-11700, end:-11600, icon:'🔮', zeit:'Zeitlos', titel:'Die Alten Götter', farbe:'#dc2626', tooltip:'<b>🔮 Die Alten Götter</b><br><i>Zeitlos</i><br><br>Diener der Leere.', deps:['titanen','loken'] },
+    { id:'titanen', gruppe:'⚡ Kosmische Urzeit', start:-10000, end:-9900, icon:'⚡', zeit:'~10.000 BDP', titel:'Die Titanen', farbe:'#d97706', tooltip:'<b>⚡ Die Titanen</b>', deps:['sargeras','nachtelfen'] },
+    { id:'sargeras', gruppe:'⚡ Kosmische Urzeit', start:-9500, end:-9400, icon:'🔥', zeit:'~9.500 BDP', titel:'Sargeras fällt', farbe:'#16a34a', tooltip:'<b>🔥 Sargeras fällt</b>', deps:['legion'] },
+    { id:'loken', gruppe:'⚡ Kosmische Urzeit', start:-9000, end:-8900, icon:'🗡️', zeit:'~9.000 BDP', titel:'Loken verrät Thorim', farbe:'#b91c1c', tooltip:'<b>🗡️ Loken verrät Thorim</b>', deps:['arthas'] },
+    { id:'legion', gruppe:'⚔️ Antike', start:-8000, end:-7900, icon:'💀', zeit:'~8.000 BDP', titel:'Brennende Legion', farbe:'#15803d', tooltip:'<b>💀 Brennende Legion</b>', deps:['krieg_antike'] },
+    { id:'nachtelfen', gruppe:'⚔️ Antike', start:-7800, end:-7700, icon:'🌙', zeit:'~7.800 BDP', titel:'Die ersten Nachtelfen', farbe:'#9333ea', tooltip:'<b>🌙 Die ersten Nachtelfen</b>', deps:['brunnen'] },
+    { id:'brunnen', gruppe:'⚔️ Antike', start:-7600, end:-7500, icon:'💧', zeit:'~7.600 BDP', titel:'Brunnen der Ewigkeit', farbe:'#06b6d4', tooltip:'<b>💧 Brunnen der Ewigkeit</b>', deps:['krieg_antike'] },
+    { id:'krieg_antike', gruppe:'⚔️ Antike', start:-7400, end:-7000, icon:'⚔️', zeit:'~7.400 BDP', titel:'Krieg der Antike', farbe:'#a855f7', tooltip:'<b>⚔️ Krieg der Antike</b>', deps:['sundbrunnen','kaldorei'] },
+    { id:'sundbrunnen', gruppe:'⚔️ Antike', start:-7000, end:-6900, icon:'☀️', zeit:'~7.000 BDP', titel:'Sonnenbrunnen', farbe:'#f59e0b', tooltip:'<b>☀️ Sonnenbrunnen</b>', deps:['illidan'] },
+    { id:'kaldorei', gruppe:'💀 Moderne', start:-4000, end:-3900, icon:'🌲', zeit:'~4.000 BDP', titel:'Kaldorei-Reich', farbe:'#10b981', tooltip:'<b>🌲 Kaldorei-Reich</b>', deps:['illidan'] },
+    { id:'arthas', gruppe:'💀 Moderne', start:20, end:21, icon:'💀', zeit:'20 ADP', titel:'Arthas wird Lichkönig', farbe:'#ef4444', tooltip:'<b>💀 Arthas wird Lichkönig</b>', deps:['illidan'] },
+    { id:'illidan', gruppe:'💀 Moderne', start:21, end:22, icon:'👁️', zeit:'21 ADP', titel:'Illidan erwacht', farbe:'#8b5cf6', tooltip:'<b>👁️ Illidan erwacht</b>', deps:[] },
+];
+
+// ============================================================
+// CSV-PARSER
 // ============================================================
 function parseCSV(text) {
     const rows = [];
@@ -267,7 +281,7 @@ function parseCSV(text) {
 // ============================================================
 async function loadData() {
     if (!CONFIG.sheetUrl) {
-        console.log('Keine Sheet-URL gesetzt – verwende Demo-Daten.');
+        console.log('Keine Sheet-URL gesetzt – Demo-Daten.');
         return DEMO_DATA;
     }
     const res = await fetch(CONFIG.sheetUrl);
@@ -290,7 +304,7 @@ async function loadData() {
             deps: (r[8] || '').split(',').map(s => s.trim()).filter(Boolean),
             tooltip: (r[9] || '').trim(),
         }))
-        .filter(r => !isNaN(r.start));
+        .filter(r => !isNaN(r.start) && r.id);
 }
 
 // ============================================================
@@ -310,11 +324,8 @@ function render(data) {
     const groupsLayer = document.getElementById('groupsLayer');
     const arrowsLayer = document.getElementById('arrows');
     groupsLayer.innerHTML = '';
-    arrowsLayer.innerHTML = '';
-    arrowsLayer.setAttribute('width', innerWidth);
-    arrowsLayer.setAttribute('viewBox', `0 0 ${innerWidth} 100`);
 
-    // Gruppen in Reihenfolge des ersten Auftretens
+    // Gruppen in Reihenfolge
     const groupOrder = [];
     const groupMap = {};
     for (const item of data) {
@@ -325,43 +336,50 @@ function render(data) {
         groupMap[item.gruppe].push(item);
     }
 
-    const itemPositions = {}; // id -> {x, y, w, h} (relativ zu timelineInner)
     let yCursor = 0;
 
     for (const groupName of groupOrder) {
         const items = groupMap[groupName];
+        const isTimeless = groupName.toLowerCase().includes('zeitlos');
 
-        // Gruppen-Container
         const groupDiv = document.createElement('div');
         groupDiv.className = 'group';
 
-        // Header
         const header = document.createElement('div');
         header.className = 'group-header';
         header.textContent = groupName;
         groupDiv.appendChild(header);
 
-        // Body
         const body = document.createElement('div');
         body.className = 'group-body';
         groupDiv.appendChild(body);
 
-        const headerH = CONFIG.groupHeaderHeight;
-        yCursor += headerH;
+        yCursor += CONFIG.groupHeaderHeight;
 
-        // Items auf Reihen verteilen (Overlap-Vermeidung)
         const sorted = [...items].sort((a, b) => a.start - b.start);
-        const rows = []; // rows[i] = letztes x-Ende in Reihe i
+
+        // Zeitlos-Anker-X: alle Items an dieselbe X-Position
+        let timelessX = null;
+        if (isTimeless && sorted.length > 0) {
+            timelessX = (sorted[0].start - rangeStart) * CONFIG.pxPerYear;
+        }
+
+        const rows = [];
 
         for (const item of sorted) {
-            const xStart = (item.start - rangeStart) * CONFIG.pxPerYear;
-            const xEndRaw = ((item.end || item.start) - rangeStart) * CONFIG.pxPerYear;
-            // Mindestbreite
-            const naturalW = xEndRaw - xStart;
-            const w = Math.max(naturalW, CONFIG.minItemWidth);
-            const x = xStart;
+            let x, w;
+            if (isTimeless && timelessX !== null) {
+                x = timelessX;
+                w = CONFIG.minItemWidth;
+            } else {
+                const xStart = (item.start - rangeStart) * CONFIG.pxPerYear;
+                const xEndRaw = ((item.end || item.start) - rangeStart) * CONFIG.pxPerYear;
+                const naturalW = xEndRaw - xStart;
+                w = Math.max(naturalW, CONFIG.minItemWidth);
+                x = xStart;
+            }
 
-            // Erste Reihe finden, in der kein Overlap
+            // Erste freie Reihe finden
             let rowIdx = 0;
             for (; rowIdx < rows.length; rowIdx++) {
                 if (rows[rowIdx] + 8 <= x) break;
@@ -370,15 +388,13 @@ function render(data) {
             rows[rowIdx] = x + w;
 
             const itemY = rowIdx * (CONFIG.rowHeight + CONFIG.rowGap);
-            const itemH = CONFIG.rowHeight;
 
-            // DOM-Element
             const el = document.createElement('div');
             el.className = 'item';
             el.style.left = x + 'px';
             el.style.top = itemY + 'px';
             el.style.width = w + 'px';
-            el.style.height = itemH + 'px';
+            el.style.height = CONFIG.rowHeight + 'px';
             el.style.background = item.farbe;
             el.dataset.id = item.id;
 
@@ -387,15 +403,6 @@ function render(data) {
                 '<div class="item-titel">' + escapeHtml(item.titel) + '</div>';
 
             body.appendChild(el);
-
-            itemPositions[item.id] = {
-                x: x,
-                y: yCursor + itemY,
-                w: w,
-                h: itemH,
-                group: groupName,
-                item: item
-            };
         }
 
         const rowsHeight = rows.length * (CONFIG.rowHeight + CONFIG.rowGap);
@@ -405,86 +412,125 @@ function render(data) {
         groupsLayer.appendChild(groupDiv);
     }
 
-    // Gesamthöhe setzen
-    inner.style.height = (yCursor + 40) + 'px';
-    arrowsLayer.setAttribute('height', yCursor + 40);
-    arrowsLayer.setAttribute('viewBox', `0 0 ${innerWidth} ${yCursor + 40}`);
+    const totalHeight = yCursor + 40;
+    inner.style.height = totalHeight + 'px';
 
-    // Pfeile zeichnen
-    drawArrows(itemPositions, arrowsLayer, innerWidth, yCursor + 40);
+    // SVG-Größe setzen
+    arrowsLayer.setAttribute('width', innerWidth);
+    arrowsLayer.setAttribute('height', totalHeight);
+    arrowsLayer.setAttribute('viewBox', `0 0 ${innerWidth} ${totalHeight}`);
+    arrowsLayer.style.width = innerWidth + 'px';
+    arrowsLayer.style.height = totalHeight + 'px';
+    arrowsLayer.innerHTML = '';
 
-    // Zeitachse
-    drawAxis(rangeStart, rangeEnd, innerWidth);
-
-    // Interaktion
-    attachInteractions(data, itemPositions);
+    // Pfeile zeichnen (nach dem DOM-Render, damit echte Positionen bekannt sind)
+    requestAnimationFrame(() => {
+        drawArrows(data);
+        drawAxis(rangeStart, rangeEnd, innerWidth);
+        attachInteractions(data);
+    });
 }
 
 // ============================================================
-// PFEILE
+// PFEILE – echte DOM-Positionen + farbige Linien
 // ============================================================
-function drawArrows(positions, svg, w, h) {
-    svg.setAttribute('width', w);
-    svg.setAttribute('height', h);
+function drawArrows(data) {
+    const svg = document.getElementById('arrows');
+    const inner = document.getElementById('timelineInner');
+    const innerRect = inner.getBoundingClientRect();
+
+    // Positionen aus dem DOM ermitteln
+    const positions = {};
+    document.querySelectorAll('.item').forEach(el => {
+        const r = el.getBoundingClientRect();
+        positions[el.dataset.id] = {
+            x: r.left - innerRect.left,
+            y: r.top - innerRect.top,
+            w: r.width,
+            h: r.height,
+            item: data.find(d => d.id === el.dataset.id)
+        };
+    });
+
+    let arrowIndex = 0;
 
     for (const id in positions) {
         const src = positions[id];
         const item = src.item;
+        if (!item) continue;
+
         for (const targetId of item.deps) {
             const dst = positions[targetId];
             if (!dst) continue;
+
+            const color = ARROW_COLORS[arrowIndex % ARROW_COLORS.length];
+            arrowIndex++;
 
             const x1 = src.x + src.w;
             const y1 = src.y + src.h / 2;
             const x2 = dst.x;
             const y2 = dst.y + dst.h / 2;
 
-            // Kurve: horizontal, dann vertikal
             const dx = x2 - x1;
             const dy = y2 - y1;
             let path;
 
-            if (dx > 20) {
+            if (Math.abs(dx) < 30 && Math.abs(dy) > 20) {
+                // Vertikal: von unten nach oben
+                const sx = src.x + src.w / 2;
+                const sy = src.y + src.h;
+                const tx = dst.x + dst.w / 2;
+                const ty = dst.y;
+                path = `M ${sx} ${sy} C ${sx} ${sy + 20}, ${tx} ${ty - 20}, ${tx} ${ty}`;
+                drawArrowPath(svg, path, color, tx, ty, 'up');
+            } else if (dx > 20) {
                 // Vorwärts
                 const cx = x1 + dx * 0.5;
                 path = `M ${x1} ${y1} C ${cx} ${y1}, ${cx} ${y2}, ${x2} ${y2}`;
+                drawArrowPath(svg, path, color, x2, y2, 'right');
             } else {
-                // Rückwärts oder überlappend – Bogen nach unten
+                // Rückwärts / überlappend
                 const midY = Math.max(src.y + src.h, dst.y + dst.h) + 25;
                 path = `M ${x1} ${y1} Q ${(x1+x2)/2} ${midY}, ${x2} ${y2}`;
+                drawArrowPath(svg, path, color, x2, y2, 'right');
             }
-
-            const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            p.setAttribute('d', path);
-            p.setAttribute('fill', 'none');
-            p.setAttribute('stroke', 'rgba(255,255,255,0.55)');
-            p.setAttribute('stroke-width', '1.5');
-            svg.appendChild(p);
-
-            // Pfeilspitze
-            const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-            const a = 6;
-            arrow.setAttribute('points',
-                `${x2},${y2} ${x2 - a},${y2 - a/2} ${x2 - a},${y2 + a/2}`);
-            arrow.setAttribute('fill', 'rgba(255,255,255,0.55)');
-            svg.appendChild(arrow);
         }
     }
+}
+
+function drawArrowPath(svg, pathD, color, ax, ay, direction) {
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', pathD);
+    p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', color);
+    p.setAttribute('stroke-width', '1.6');
+    p.setAttribute('stroke-linecap', 'round');
+    svg.appendChild(p);
+
+    // Pfeilspitze
+    const size = 6;
+    let points;
+    if (direction === 'up') {
+        points = `${ax},${ay} ${ax - size/2},${ay + size} ${ax + size/2},${ay + size}`;
+    } else {
+        points = `${ax},${ay} ${ax - size},${ay - size/2} ${ax - size},${ay + size/2}`;
+    }
+    const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    arrow.setAttribute('points', points);
+    arrow.setAttribute('fill', color);
+    svg.appendChild(arrow);
 }
 
 // ============================================================
 // ZEITACHSE
 // ============================================================
 function drawAxis(rangeStart, rangeEnd, innerWidth) {
-    // Entferne alte Achse
     const old = document.querySelector('.axis');
     if (old) old.remove();
 
     const axis = document.createElement('div');
     axis.className = 'axis';
     axis.style.width = innerWidth + 'px';
-    axis.style.position = 'sticky';
-    axis.style.bottom = '0';
 
     for (let y = rangeStart; y <= rangeEnd; y += CONFIG.tickInterval) {
         const x = (y - rangeStart) * CONFIG.pxPerYear;
@@ -507,16 +553,14 @@ function drawAxis(rangeStart, rangeEnd, innerWidth) {
 // ============================================================
 // INTERAKTION
 // ============================================================
-function attachInteractions(data, positions) {
+function attachInteractions(data) {
     const tooltip = document.getElementById('tooltip');
-    let activeId = null;
 
     document.querySelectorAll('.item').forEach(el => {
         el.addEventListener('mouseenter', (e) => {
             const id = el.dataset.id;
             const item = data.find(d => d.id === id);
             if (!item) return;
-            activeId = id;
             tooltip.innerHTML = item.tooltip;
             tooltip.style.display = 'block';
             positionTooltip(e);
@@ -524,7 +568,6 @@ function attachInteractions(data, positions) {
         el.addEventListener('mousemove', positionTooltip);
         el.addEventListener('mouseleave', () => {
             tooltip.style.display = 'none';
-            activeId = null;
         });
         el.addEventListener('click', () => {
             const id = el.dataset.id;
