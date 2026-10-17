@@ -144,11 +144,11 @@
         background: #3b2680ff;
         border-radius: 6px;
         padding: 5px 10px;
-        cursor: pointer;
+        cursor: default;
         transition: filter 0.15s, transform 0.1s;
         display: flex;
         flex-direction: column;
-        justify-content: center;
+        justify-content: flex-start;
         user-select: text;
         border-left: 3px solid #e91e8c;
         overflow: hidden;
@@ -158,6 +158,53 @@
         filter: brightness(1.2);
         transform: translateY(-1px);
         z-index: 6;
+    }
+    .item-v.expandable { padding-right: 28px; }
+    .item-v .item-head {
+        height: 30px;           /* = itemHeight - 2 * Padding */
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-width: 0;
+    }
+    .item-v .item-detail {
+        margin-top: 2px;
+        padding: 6px 0 12px;
+        border-top: 1px solid rgba(255,255,255,0.22);
+        font-size: 0.75rem;
+        line-height: 1.45;
+        color: rgba(255,255,255,0.92);
+        overflow-wrap: anywhere;
+    }
+    .item-v .item-detail b { color: #fff; }
+    .item-v .item-detail i { color: rgba(255,255,255,0.7); }
+    .item-v .item-toggle {
+        position: absolute;
+        right: 4px; bottom: 2px;
+        width: 22px; height: 18px;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .item-v .item-toggle::before {
+        content: '';
+        border-left: 5px solid transparent;
+        border-right: 5px solid transparent;
+        border-top: 6px solid rgba(255,255,255,0.85);
+        transition: transform 0.2s;
+    }
+    .item-v .item-toggle:hover::before { border-top-color: #fff; }
+    .item-v.expanded .item-toggle::before { transform: rotate(180deg); }
+    .item-measure {
+        position: absolute;
+        visibility: hidden;
+        left: -9999px; top: 0;
+        pointer-events: none;
     }
     .item-v .item-zeit {
         font-size: 0.65rem;
@@ -187,46 +234,6 @@
     .arrows-v.has-hl .conn.active { opacity: 1; }
     .arrows-v .conn.active path { stroke-opacity: 1; stroke-width: 2.4; }
 
-    /* ---- Tooltip & Toast ---- */
-    .tooltip {
-        position: fixed;
-        background: rgba(20, 20, 35, 0.97);
-        color: #e8e8e8;
-        padding: 12px 16px;
-        border: 1px solid #4a4a6e;
-        border-radius: 8px;
-        box-shadow: 0 6px 24px rgba(0,0,0,0.7);
-        max-width: 360px;
-        font-size: 13px;
-        line-height: 1.55;
-        z-index: 99999;
-        pointer-events: none;
-        display: none;
-    }
-    .tooltip b { color: #f59e0b; }
-    .tooltip i { color: #9ca3af; }
-
-    .toast {
-        position: fixed;
-        bottom: 30px; left: 50%;
-        transform: translateX(-50%) translateY(20px);
-        background: rgba(20, 20, 35, 0.96);
-        color: #c4b5fd;
-        padding: 10px 20px;
-        border: 1px solid #4a4a6e;
-        border-radius: 8px;
-        box-shadow: 0 6px 24px rgba(0,0,0,0.6);
-        font-size: 0.9rem;
-        opacity: 0;
-        transition: opacity 0.25s, transform 0.25s;
-        pointer-events: none;
-        z-index: 10000;
-    }
-    .toast.show {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-    }
-
     .status {
         text-align: center; color: #c4b5fd; font-size: 0.85rem;
         margin-top: 12px; min-height: 20px;
@@ -254,8 +261,6 @@
 
 <div class="status" id="status">Lade Daten…</div>
 
-<div class="tooltip" id="tooltip"></div>
-<div class="toast" id="toast"></div>
 
 <script>
 // ============================================================
@@ -264,7 +269,7 @@
 const CONFIG = {
     sheetUrl: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRGtORIe7TdQLBiXK6qmWcoC-z-ixoYzMOwySVpKdj0mHxRtH769Hl_HNz6FCdL4u5NMLUPJcfQ3EvZ/pub?output=csv',
 
-    itemHeight: 40,            // feste Höhe eines Items
+    itemHeight: 40,            // Höhe eines eingeklappten Items
     itemWidth: 320,            // Breite eines Items
     itemX: 24,                 // linker Rand der Items
     itemGap: 12,               // Abstand zwischen Items (Platz für kurze Pfeile)
@@ -296,8 +301,8 @@ const DEMO_DATA = [
     { id:'licht', gruppe:'🌌 ZEITLOS', start:-12100, end:-12000, icon:'🌌', zeit:'Zeitlos', titel:'Licht und Leere', farbe:'#7c3aed', tooltip:'<b>🌌 Licht und Leere</b>', deps:['naaru','alte_goetter'] },
     { id:'naaru', gruppe:'🌌 ZEITLOS', start:-11900, end:-11800, icon:'✨', zeit:'Zeitlos', titel:'Die Naaru', farbe:'#2563eb', tooltip:'<b>✨ Die Naaru</b>', deps:['titanen'] },
     { id:'alte_goetter', gruppe:'🌌 ZEITLOS', start:-11700, end:-11600, icon:'🔮', zeit:'Zeitlos', titel:'Die Alten Götter', farbe:'#dc2626', tooltip:'<b>🔮 Die Alten Götter</b>', deps:['titanen','loken'] },
-    { id:'titanen', gruppe:'⚡ Kosmische Urzeit', start:-10000, end:-9900, icon:'⚡', zeit:'~10.000 BDP', titel:'Die Titanen', farbe:'#d97706', tooltip:'<b>⚡ Die Titanen</b>', deps:['sargeras','nachtelfen'] },
-    { id:'sargeras', gruppe:'⚡ Kosmische Urzeit', start:-9500, end:-9400, icon:'🔥', zeit:'~9.500 BDP', titel:'Sargeras fällt', farbe:'#16a34a', tooltip:'<b>🔥 Sargeras fällt</b>', deps:['legion'] },
+    { id:'titanen', gruppe:'⚡ Kosmische Urzeit', start:-10000, end:-9900, icon:'⚡', zeit:'~10.000 BDP', titel:'Die Titanen', farbe:'#d97706', tooltip:'<b>⚡ Die Titanen</b><br>Uralte, gottgleiche Wesen, die Welten ordneten und Azeroth formten.', deps:['sargeras','nachtelfen'] },
+    { id:'sargeras', gruppe:'⚡ Kosmische Urzeit', start:-9500, end:-9400, icon:'🔥', zeit:'~9.500 BDP', titel:'Sargeras fällt', farbe:'#16a34a', tooltip:'<b>🔥 Sargeras fällt</b><br>Der größte Titanenkrieger wendet sich ab und gründet die Brennende Legion.<br><i>Ein Wendepunkt der Kosmologie.</i>', deps:['legion'] },
     { id:'loken', gruppe:'⚡ Kosmische Urzeit', start:-9000, end:-8900, icon:'🗡️', zeit:'~9.000 BDP', titel:'Loken verrät Thorim', farbe:'#b91c1c', tooltip:'<b>🗡️ Loken verrät Thorim</b>', deps:['arthas'] },
     { id:'legion', gruppe:'⚔️ Antike', start:-8000, end:-7900, icon:'💀', zeit:'~8.000 BDP', titel:'Brennende Legion', farbe:'#15803d', tooltip:'<b>💀 Brennende Legion</b>', deps:['krieg_antike'] },
     { id:'nachtelfen', gruppe:'⚔️ Antike', start:-7800, end:-7700, icon:'🌙', zeit:'~7.800 BDP', titel:'Die ersten Nachtelfen', farbe:'#9333ea', tooltip:'<b>🌙 Die ersten Nachtelfen</b>', deps:['brunnen'] },
@@ -305,7 +310,7 @@ const DEMO_DATA = [
     { id:'krieg_antike', gruppe:'⚔️ Antike', start:-7400, end:-7000, icon:'⚔️', zeit:'~7.400 BDP', titel:'Krieg der Antike', farbe:'#a855f7', tooltip:'<b>⚔️ Krieg der Antike</b>', deps:['sundbrunnen','kaldorei'] },
     { id:'sundbrunnen', gruppe:'⚔️ Antike', start:-7000, end:-6900, icon:'☀️', zeit:'~7.000 BDP', titel:'Sonnenbrunnen', farbe:'#f59e0b', tooltip:'<b>☀️ Sonnenbrunnen</b>', deps:['illidan'] },
     { id:'kaldorei', gruppe:'💀 Moderne', start:-4000, end:-3900, icon:'🌲', zeit:'~4.000 BDP', titel:'Kaldorei-Reich', farbe:'#10b981', tooltip:'<b>🌲 Kaldorei-Reich</b>', deps:['illidan'] },
-    { id:'arthas', gruppe:'💀 Moderne', start:20, end:21, icon:'💀', zeit:'20 ADP', titel:'Arthas wird Lichkönig', farbe:'#ef4444', tooltip:'<b>💀 Arthas wird Lichkönig</b>', deps:['illidan'] },
+    { id:'arthas', gruppe:'💀 Moderne', start:20, end:21, icon:'💀', zeit:'20 ADP', titel:'Arthas wird Lichkönig', farbe:'#ef4444', tooltip:'<b>💀 Arthas wird Lichkönig</b><br>Der Prinz von Lordaeron greift zu Frostgram und wird zum Lichkönig von Nordend.', deps:['illidan'] },
     { id:'illidan', gruppe:'💀 Moderne', start:21, end:22, icon:'👁️', zeit:'21 ADP', titel:'Illidan erwacht', farbe:'#8b5cf6', tooltip:'<b>👁️ Illidan erwacht</b>', deps:[] },
 ];
 
@@ -389,21 +394,42 @@ function svgEl(name, attrs) {
     return el;
 }
 
-function render(data) {
-    const axisV = document.getElementById('axisV');
-    const canvasV = document.getElementById('canvasV');
-    const arrowsV = document.getElementById('arrowsV');
-    const sectionsLayer = document.getElementById('sectionsLayer');
-    const itemsLayer = document.getElementById('itemsLayer');
+const expanded = new Set();   // IDs der aufgeklappten Items
+let currentData = [];
+let state = null;             // { layout, list, els, geom }
+let animHandle = null;
+const HEAD = 7;               // Länge der Pfeilspitze
+const ANIM_MS = 280;
 
-    axisV.innerHTML = '';
-    sectionsLayer.innerHTML = '';
-    itemsLayer.innerHTML = '';
-    arrowsV.innerHTML = '';
+// Tooltip-Text ohne die Titelzeile = Detailtext (leer → nicht ausklappbar)
+function getDetail(item) {
+    if (item._detail !== undefined) return item._detail;
+    let html = item.tooltip || '';
+    const m = /^\s*<b>([\s\S]*?)<\/b>\s*(?:<br\s*\/?>\s*)*/i.exec(html);
+    if (m && htmlToPlain(m[1]).includes(item.titel)) html = html.slice(m[0].length);
+    item._detail = htmlToPlain(html) ? html : '';
+    return item._detail;
+}
 
-    // ──────────────────────────────────────────────────
-    // Gruppen bilden – Zeitlos immer zuerst
-    // ──────────────────────────────────────────────────
+// Höhe des Detailtexts messen (gleiche Breite/Padding wie ein echtes, ausklappbares Item)
+function getDetailHeight(item) {
+    if (item._dh !== undefined) return item._dh;
+    const probe = document.createElement('div');
+    probe.className = 'item-v expandable item-measure';
+    probe.style.width = CONFIG.itemWidth + 'px';
+    probe.style.height = 'auto';
+    probe.innerHTML = '<div class="item-detail">' + getDetail(item) + '</div>';
+    document.body.appendChild(probe);
+    item._dh = probe.firstChild.offsetHeight + 2;   // + margin-top
+    document.body.removeChild(probe);
+    return item._dh;
+}
+
+// ──────────────────────────────────────────────────
+// Layout (rein berechnend, ohne DOM)
+// ──────────────────────────────────────────────────
+function computeLayout(data) {
+    const C = CONFIG;
     const groupMap = {};
     const groupOrder = [];
     for (const item of data) {
@@ -412,18 +438,12 @@ function render(data) {
     }
     const groups = groupOrder.map(name => {
         const items = groupMap[name].slice().sort((a, b) => a.start - b.start);
-        const timeless = /zeitlos/i.test(name) || items.every(i => i.start < CONFIG.timelessThreshold);
+        const timeless = /zeitlos/i.test(name) || items.every(i => i.start < C.timelessThreshold);
         return { name, items, timeless };
     });
-    groups.sort((a, b) => (b.timeless ? 1 : 0) - (a.timeless ? 1 : 0));   // stabil
+    groups.sort((a, b) => (b.timeless ? 1 : 0) - (a.timeless ? 1 : 0));   // Zeitlos zuerst (stabil)
 
-    // ──────────────────────────────────────────────────
-    // Kompaktes Layout: Items der Reihe nach stapeln
-    // ──────────────────────────────────────────────────
-    const C = CONFIG;
-    const pos = {};              // id -> {x, y, w, h, item, row, group}
-    const axisEntries = [];      // Achsen-Labels
-    const breaks = [];           // Zeitsprung-Marker
+    const pos = {}, headers = [], axis = [], breaks = [];
     let y = C.canvasPaddingTop;
     let prevStart = null;
     let row = 0;
@@ -437,15 +457,8 @@ function render(data) {
             }
             y += gap;
         }
-
-        const headerEl = document.createElement('div');
-        headerEl.className = 'group-header-v';
-        headerEl.style.top = y + 'px';
-        headerEl.style.height = C.groupHeaderHeight + 'px';
-        headerEl.style.lineHeight = C.groupHeaderHeight + 'px';
-        headerEl.textContent = g.name;
-        sectionsLayer.appendChild(headerEl);
-        if (g.timeless) axisEntries.push({ y, h: C.groupHeaderHeight, label: 'Zeitlos', timeless: true });
+        headers.push({ y, name: g.name });
+        if (g.timeless) axis.push({ y, h: C.groupHeaderHeight, label: 'Zeitlos', timeless: true });
         y += C.groupHeaderHeight + C.groupHeaderGap;
 
         g.items.forEach((item, idx) => {
@@ -457,90 +470,59 @@ function render(data) {
                 }
                 y += gap;
             }
-            pos[item.id] = { x: C.itemX, y, w: C.itemWidth, h: C.itemHeight, item, row: row++, group: gi };
-            if (!g.timeless) axisEntries.push({ y, h: C.itemHeight, label: formatYear(item.start) });
-            y += C.itemHeight;
+            const h = C.itemHeight + ((expanded.has(item.id) && getDetail(item)) ? getDetailHeight(item) : 0);
+            pos[item.id] = { x: C.itemX, y, w: C.itemWidth, h, item, row: row++, group: gi };
+            if (!g.timeless) axis.push({ y, h: C.itemHeight, label: formatYear(item.start) });
+            y += h;
             if (!g.timeless) prevStart = item.start;
         });
     });
 
-    const totalHeight = y + C.canvasPaddingBottom;
-    axisV.style.height = totalHeight + 'px';
-    canvasV.style.height = totalHeight + 'px';
+    return { pos, headers, axis, breaks, total: y + C.canvasPaddingBottom };
+}
 
-    // Achse
-    for (const e of axisEntries) {
-        const tick = document.createElement('div');
-        tick.className = 'axis-tick-v' + (e.timeless ? ' timeless' : '');
-        tick.style.top = e.y + 'px';
-        tick.style.height = e.h + 'px';
-        tick.textContent = e.label;
-        axisV.appendChild(tick);
-    }
-    for (const b of breaks) {
-        const el = document.createElement('div');
-        el.className = 'axis-break';
-        el.style.top = b.y + 'px';
-        el.style.height = b.h + 'px';
-        el.style.lineHeight = b.h + 'px';
-        el.textContent = '⋮ ' + b.years.toLocaleString('de-DE') + ' J.';
-        axisV.appendChild(el);
-    }
-
-    // ──────────────────────────────────────────────────
-    // Items zeichnen
-    // ──────────────────────────────────────────────────
-    for (const id in pos) {
-        const p = pos[id];
-        const el = document.createElement('div');
-        el.className = 'item-v';
-        el.style.left = p.x + 'px';
-        el.style.top = p.y + 'px';
-        el.style.width = p.w + 'px';
-        el.style.height = p.h + 'px';
-        el.style.background = p.item.farbe;
-        el.dataset.id = id;
-        el.innerHTML =
-            '<div class="item-zeit">' + escapeHtml(p.item.icon + ' ' + p.item.zeit) + '</div>' +
-            '<div class="item-titel">' + escapeHtml(p.item.titel) + '</div>';
-        itemsLayer.appendChild(el);
-    }
-
-    // ──────────────────────────────────────────────────
-    // Verbindungen sammeln
-    // ──────────────────────────────────────────────────
-    const straight = [];   // direkter Nachfolger direkt darunter
-    const lane = [];       // alles andere: Spur rechts neben den Items
+// ──────────────────────────────────────────────────
+// Verbindungen: Art, Anschlusspunkte, Spuren
+// ──────────────────────────────────────────────────
+function computeConns(layout) {
+    const C = CONFIG, pos = layout.pos;
+    const list = [];
     for (const id in pos) {
         const s = pos[id];
         for (const targetId of s.item.deps) {
             const d = pos[targetId];
             if (!d || d === s) continue;
-            const conn = { src: id, dst: targetId, color: lighten(s.item.farbe, 0.4) };
-            if (d.row === s.row + 1 && d.group === s.group) straight.push(conn);
-            else lane.push(conn);
+            list.push({
+                key: id + '>' + targetId, src: id, dst: targetId,
+                color: lighten(s.item.farbe, 0.4),
+                straight: d.row === s.row + 1 && d.group === s.group,
+                lane: 0, o1: 0, o2: 0
+            });
         }
     }
+    const laneConns = list.filter(c => !c.straight);
 
-    // Anschlusspunkte an der rechten Kante verteilen (mehrere Pfeile pro Item)
+    // Anschlusspunkte an der rechten Kante verteilen (Offset relativ zur Header-Mitte)
     const ports = {};
-    for (const c of lane) {
-        (ports[c.src] = ports[c.src] || []).push({ c, key: 'y1', other: pos[c.dst].y });
-        (ports[c.dst] = ports[c.dst] || []).push({ c, key: 'y2', other: pos[c.src].y });
+    for (const c of laneConns) {
+        (ports[c.src] = ports[c.src] || []).push({ c, key: 'o1', other: pos[c.dst].y });
+        (ports[c.dst] = ports[c.dst] || []).push({ c, key: 'o2', other: pos[c.src].y });
     }
     for (const id in ports) {
         const arr = ports[id].sort((a, b) => a.other - b.other);
-        const p = pos[id];
         const n = arr.length;
-        const step = n > 1 ? Math.min(5, (p.h - 14) / (n - 1)) : 0;
-        arr.forEach((pt, i) => { pt.c[pt.key] = p.y + p.h / 2 + (i - (n - 1) / 2) * step; });
+        const step = n > 1 ? Math.min(5, (C.itemHeight - 14) / (n - 1)) : 0;
+        arr.forEach((pt, i) => { pt.c[pt.key] = (i - (n - 1) / 2) * step; });
     }
 
     // Spuren vergeben: kurze Verbindungen innen, lange außen
-    lane.sort((a, b) => Math.abs(a.y1 - a.y2) - Math.abs(b.y1 - b.y2));
+    const mid = id => pos[id].y + C.itemHeight / 2;
+    const sorted = laneConns.slice().sort((a, b) =>
+        Math.abs(mid(a.src) + a.o1 - mid(a.dst) - a.o2) - Math.abs(mid(b.src) + b.o1 - mid(b.dst) - b.o2));
     const laneUse = [];
-    for (const c of lane) {
-        const lo = Math.min(c.y1, c.y2), hi = Math.max(c.y1, c.y2);
+    for (const c of sorted) {
+        const y1 = mid(c.src) + c.o1, y2 = mid(c.dst) + c.o2;
+        const lo = Math.min(y1, y2), hi = Math.max(y1, y2);
         let k = 0;
         for (;; k++) {
             const used = laneUse[k] = laneUse[k] || [];
@@ -548,104 +530,272 @@ function render(data) {
         }
         c.lane = k;
     }
+    return { list, maxLane: laneConns.reduce((m, c) => Math.max(m, c.lane), -1) };
+}
 
-    const maxLane = lane.reduce((m, c) => Math.max(m, c.lane), -1);
-    const canvasWidth = C.itemX + C.itemWidth + C.laneOffset + (maxLane + 1) * C.laneSpacing + 40;
-    canvasV.style.minWidth = canvasWidth + 'px';
-    arrowsV.style.width = canvasWidth + 'px';
-    arrowsV.style.height = totalHeight + 'px';
-    arrowsV.setAttribute('width', canvasWidth);
-    arrowsV.setAttribute('height', totalHeight);
-    arrowsV.setAttribute('viewBox', `0 0 ${canvasWidth} ${totalHeight}`);
+// ──────────────────────────────────────────────────
+// Geometrie (alles, was sich beim Aufklappen verändert) + Interpolation
+// ──────────────────────────────────────────────────
+function geomOf(layout, cs) {
+    const C = CONFIG;
+    const items = {};
+    for (const id in layout.pos) items[id] = { y: layout.pos[id].y, h: layout.pos[id].h };
+    const conns = {};
+    for (const c of cs.list) if (!c.straight) conns[c.key] = { lane: c.lane, o1: c.o1, o2: c.o2 };
+    return {
+        items,
+        headers: layout.headers.map(h => h.y),
+        axis: layout.axis.map(a => a.y),
+        breaks: layout.breaks.map(b => b.y),
+        total: layout.total,
+        width: C.itemX + C.itemWidth + C.laneOffset + (cs.maxLane + 1) * C.laneSpacing + 40,
+        conns
+    };
+}
 
-    // ──────────────────────────────────────────────────
-    // Pfeile zeichnen
-    // ──────────────────────────────────────────────────
-    const HEAD = 7;
-    function addConn(c, d, headPoints, startDot) {
+const lerp = (a, b, t) => a + (b - a) * t;
+function lerpGeom(a, b, t) {
+    const items = {};
+    for (const id in b.items) items[id] = { y: lerp(a.items[id].y, b.items[id].y, t), h: lerp(a.items[id].h, b.items[id].h, t) };
+    const conns = {};
+    for (const k in b.conns) {
+        const p = a.conns[k] || b.conns[k], q = b.conns[k];
+        conns[k] = { lane: lerp(p.lane, q.lane, t), o1: lerp(p.o1, q.o1, t), o2: lerp(p.o2, q.o2, t) };
+    }
+    const arr = (x, y) => y.map((v, i) => lerp(x[i], v, t));
+    return {
+        items, conns,
+        headers: arr(a.headers, b.headers), axis: arr(a.axis, b.axis), breaks: arr(a.breaks, b.breaks),
+        total: lerp(a.total, b.total, t), width: lerp(a.width, b.width, t)
+    };
+}
+
+// Geometrie ins DOM schreiben (Items, Header, Achse, Pfeile)
+function applyGeom(g) {
+    const C = CONFIG;
+    const { layout, list, els } = state;
+
+    for (const id in els.items) {
+        els.items[id].style.top = g.items[id].y + 'px';
+        els.items[id].style.height = g.items[id].h + 'px';
+    }
+    els.headers.forEach((el, i) => el.style.top = g.headers[i] + 'px');
+    els.axis.forEach((el, i) => el.style.top = g.axis[i] + 'px');
+    els.breaks.forEach((el, i) => el.style.top = g.breaks[i] + 'px');
+
+    const canvasV = document.getElementById('canvasV');
+    const axisV = document.getElementById('axisV');
+    const arrowsV = document.getElementById('arrowsV');
+    axisV.style.height = g.total + 'px';
+    canvasV.style.height = g.total + 'px';
+    canvasV.style.minWidth = g.width + 'px';
+    arrowsV.style.width = g.width + 'px';
+    arrowsV.style.height = g.total + 'px';
+    arrowsV.setAttribute('width', g.width);
+    arrowsV.setAttribute('height', g.total);
+    arrowsV.setAttribute('viewBox', `0 0 ${g.width} ${g.total}`);
+
+    for (const c of list) {
+        const s = layout.pos[c.src], d = layout.pos[c.dst];
+        const gs = g.items[c.src], gd = g.items[c.dst];
+        let dPath, head, dot;
+        if (c.straight) {
+            const x = s.x + s.w / 2;
+            const y1 = gs.y + gs.h, y2 = gd.y;
+            const h = Math.max(0, Math.min(HEAD - 1, y2 - y1 - 2));
+            dPath = `M ${x} ${y1} L ${x} ${y2 - h}`;
+            head = `${x},${y2} ${x - 3.5},${y2 - h} ${x + 3.5},${y2 - h}`;
+            dot = [x, y1];
+        } else {
+            const o = g.conns[c.key];
+            const x0 = s.x + s.w;
+            const y1 = gs.y + C.itemHeight / 2 + o.o1;
+            const y2 = gd.y + C.itemHeight / 2 + o.o2;
+            const laneX = x0 + C.laneOffset + o.lane * C.laneSpacing;
+            const dir = y2 > y1 ? 1 : -1;
+            const r = Math.max(1, Math.min(C.cornerRadius, Math.abs(y2 - y1) / 2, laneX - x0 - HEAD - 1));
+            dPath =
+                `M ${x0} ${y1} H ${laneX - r} Q ${laneX} ${y1} ${laneX} ${y1 + dir * r} ` +
+                `V ${y2 - dir * r} Q ${laneX} ${y2} ${laneX - r} ${y2} H ${x0 + HEAD}`;
+            head = `${x0},${y2} ${x0 + HEAD},${y2 - 3.5} ${x0 + HEAD},${y2 + 3.5}`;
+            dot = [x0, y1];
+        }
+        c.el.path.setAttribute('d', dPath);
+        c.el.poly.setAttribute('points', head);
+        c.el.dot.setAttribute('cx', dot[0]);
+        c.el.dot.setAttribute('cy', dot[1]);
+    }
+}
+
+// ──────────────────────────────────────────────────
+// Aufbau (einmalig)
+// ──────────────────────────────────────────────────
+function render(data) {
+    currentData = data;
+    if (animHandle) { cancelAnimationFrame(animHandle); animHandle = null; }
+    const axisV = document.getElementById('axisV');
+    const sectionsLayer = document.getElementById('sectionsLayer');
+    const itemsLayer = document.getElementById('itemsLayer');
+    const arrowsV = document.getElementById('arrowsV');
+    axisV.innerHTML = '';
+    sectionsLayer.innerHTML = '';
+    itemsLayer.innerHTML = '';
+    arrowsV.innerHTML = '';
+
+    const C = CONFIG;
+    const layout = computeLayout(data);
+    const cs = computeConns(layout);
+    const els = { items: {}, headers: [], axis: [], breaks: [] };
+
+    for (const h of layout.headers) {
+        const el = document.createElement('div');
+        el.className = 'group-header-v';
+        el.style.height = C.groupHeaderHeight + 'px';
+        el.style.lineHeight = C.groupHeaderHeight + 'px';
+        el.textContent = h.name;
+        sectionsLayer.appendChild(el);
+        els.headers.push(el);
+    }
+    for (const a of layout.axis) {
+        const el = document.createElement('div');
+        el.className = 'axis-tick-v' + (a.timeless ? ' timeless' : '');
+        el.style.height = a.h + 'px';
+        el.textContent = a.label;
+        axisV.appendChild(el);
+        els.axis.push(el);
+    }
+    for (const b of layout.breaks) {
+        const el = document.createElement('div');
+        el.className = 'axis-break';
+        el.style.height = b.h + 'px';
+        el.style.lineHeight = b.h + 'px';
+        el.textContent = '⋮ ' + b.years.toLocaleString('de-DE') + ' J.';
+        axisV.appendChild(el);
+        els.breaks.push(el);
+    }
+    for (const id in layout.pos) {
+        const p = layout.pos[id];
+        const el = document.createElement('div');
+        el.className = 'item-v';
+        el.style.left = p.x + 'px';
+        el.style.width = p.w + 'px';
+        el.style.background = p.item.farbe;
+        el.dataset.id = id;
+        const canExpand = !!getDetail(p.item);
+        const isOpen = canExpand && expanded.has(id);
+        if (canExpand) el.classList.add('expandable');
+        if (isOpen) el.classList.add('expanded');
+        el.innerHTML =
+            '<div class="item-head">' +
+                '<div class="item-zeit">' + escapeHtml(p.item.icon + ' ' + p.item.zeit) + '</div>' +
+                '<div class="item-titel">' + escapeHtml(p.item.titel) + '</div>' +
+            '</div>' +
+            (isOpen ? '<div class="item-detail">' + getDetail(p.item) + '</div>' : '') +
+            (canExpand
+                ? '<button class="item-toggle" type="button" aria-expanded="' + isOpen +
+                  '" aria-label="' + (isOpen ? 'Einklappen' : 'Ausklappen') + '"></button>'
+                : '');
+        itemsLayer.appendChild(el);
+        els.items[id] = el;
+    }
+    for (const c of cs.list) {
         const g = svgEl('g', { class: 'conn' });
         g.dataset.src = c.src;
         g.dataset.dst = c.dst;
-        g.appendChild(svgEl('path', {
-            d, fill: 'none', stroke: c.color, 'stroke-opacity': '0.6',
+        const path = svgEl('path', {
+            fill: 'none', stroke: c.color, 'stroke-opacity': '0.6',
             'stroke-width': '1.7', 'stroke-linecap': 'round', 'stroke-linejoin': 'round'
-        }));
-        g.appendChild(svgEl('polygon', { points: headPoints, fill: c.color, 'fill-opacity': '0.9' }));
-        if (startDot) g.appendChild(svgEl('circle', { cx: startDot[0], cy: startDot[1], r: 2.2, fill: c.color, 'fill-opacity': '0.9' }));
+        });
+        const poly = svgEl('polygon', { fill: c.color, 'fill-opacity': '0.9' });
+        const dot = svgEl('circle', { r: 2.2, fill: c.color, 'fill-opacity': '0.9' });
+        g.append(path, poly, dot);
         arrowsV.appendChild(g);
+        c.el = { path, poly, dot };
     }
 
-    for (const c of straight) {
-        const s = pos[c.src], d = pos[c.dst];
-        const x = s.x + s.w / 2;
-        const y1 = s.y + s.h, y2 = d.y;
-        const h = Math.min(HEAD - 1, (y2 - y1) - 2);
-        addConn(c, `M ${x} ${y1} L ${x} ${y2 - h}`,
-            `${x},${y2} ${x - 3.5},${y2 - h} ${x + 3.5},${y2 - h}`, [x, y1]);
-    }
-
-    for (const c of lane) {
-        const s = pos[c.src], d = pos[c.dst];
-        const x0 = s.x + s.w;
-        const laneX = x0 + C.laneOffset + c.lane * C.laneSpacing;
-        const dir = c.y2 > c.y1 ? 1 : -1;
-        const r = Math.max(1, Math.min(C.cornerRadius, Math.abs(c.y2 - c.y1) / 2, laneX - x0 - HEAD - 1));
-        const dPath =
-            `M ${x0} ${c.y1} H ${laneX - r} Q ${laneX} ${c.y1} ${laneX} ${c.y1 + dir * r} ` +
-            `V ${c.y2 - dir * r} Q ${laneX} ${c.y2} ${laneX - r} ${c.y2} H ${x0 + HEAD}`;
-        addConn(c, dPath,
-            `${x0},${c.y2} ${x0 + HEAD},${c.y2 - 3.5} ${x0 + HEAD},${c.y2 + 3.5}`, [x0, c.y1]);
-    }
-
-    // Interaktion
+    state = { layout, list: cs.list, els, geom: geomOf(layout, cs) };
+    applyGeom(state.geom);
     attachInteractions(data);
+}
+
+// ──────────────────────────────────────────────────
+// Auf-/Zuklappen mit Animation
+// ──────────────────────────────────────────────────
+function removeClosedDetails() {
+    for (const id in state.els.items) {
+        if (expanded.has(id)) continue;
+        const d = state.els.items[id].querySelector('.item-detail');
+        if (d) d.remove();
+    }
+}
+
+function toggleItem(id) {
+    const el = state.els.items[id];
+    const item = state.layout.pos[id].item;
+    const opening = !expanded.has(id);
+    if (opening) expanded.add(id); else expanded.delete(id);
+
+    el.classList.toggle('expanded', opening);
+    const btn = el.querySelector('.item-toggle');
+    if (btn) {
+        btn.setAttribute('aria-expanded', opening);
+        btn.setAttribute('aria-label', opening ? 'Einklappen' : 'Ausklappen');
+    }
+    if (opening && !el.querySelector('.item-detail')) {
+        const d = document.createElement('div');
+        d.className = 'item-detail';
+        d.innerHTML = getDetail(item);
+        el.insertBefore(d, btn);
+    }
+
+    // Neue Ziel-Geometrie; Start = aktueller (ggf. halb animierter) Zustand
+    const layout = computeLayout(currentData);
+    const cs = computeConns(layout);
+    const target = geomOf(layout, cs);
+    const from = state.geom;
+    state.layout = layout;
+    if (animHandle) { cancelAnimationFrame(animHandle); animHandle = null; }
+
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) {
+        state.geom = target;
+        applyGeom(target);
+        removeClosedDetails();
+        return;
+    }
+    const t0 = performance.now();
+    const frame = (now) => {
+        const t = Math.min(1, (now - t0) / ANIM_MS);
+        const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;   // easeInOutCubic
+        state.geom = t < 1 ? lerpGeom(from, target, e) : target;
+        applyGeom(state.geom);
+        if (t < 1) animHandle = requestAnimationFrame(frame);
+        else { animHandle = null; removeClosedDetails(); }
+    };
+    animHandle = requestAnimationFrame(frame);
 }
 
 // ============================================================
 // INTERAKTION
 // ============================================================
 function attachInteractions(data) {
-    const tooltip = document.getElementById('tooltip');
     const arrows = document.getElementById('arrowsV');
 
     document.querySelectorAll('.item-v').forEach(el => {
-        el.addEventListener('mouseenter', (e) => {
-            const id = el.dataset.id;
+        const id = el.dataset.id;
+        el.addEventListener('mouseenter', () => {
             arrows.classList.add('has-hl');
             arrows.querySelectorAll('.conn').forEach(g =>
                 g.classList.toggle('active', g.dataset.src === id || g.dataset.dst === id));
-            const item = data.find(d => d.id === id);
-            if (!item) return;
-            tooltip.innerHTML = item.tooltip;
-            tooltip.style.display = 'block';
-            positionTooltip(e);
         });
-        el.addEventListener('mousemove', positionTooltip);
-        el.addEventListener('mouseleave', () => {
-            arrows.classList.remove('has-hl');
-            tooltip.style.display = 'none';
-        });
-        el.addEventListener('click', () => {
-            const id = el.dataset.id;
-            const item = data.find(d => d.id === id);
-            if (!item) return;
-            const text = htmlToPlain(item.tooltip);
-            navigator.clipboard.writeText(text)
-                .then(() => showToast('📋 „' + text.split('\n')[0] + '" kopiert!'))
-                .catch(() => showToast('⚠️ Kopieren fehlgeschlagen – HTTPS nötig'));
+        el.addEventListener('mouseleave', () => arrows.classList.remove('has-hl'));
+
+        const toggle = el.querySelector('.item-toggle');
+        if (toggle) toggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleItem(id);
         });
     });
-
-    function positionTooltip(e) {
-        const padding = 14;
-        let x = e.clientX + padding;
-        let y = e.clientY + padding;
-        const rect = tooltip.getBoundingClientRect();
-        if (x + rect.width > window.innerWidth) x = e.clientX - rect.width - padding;
-        if (y + rect.height > window.innerHeight) y = e.clientY - rect.height - padding;
-        tooltip.style.left = x + 'px';
-        tooltip.style.top = y + 'px';
-    }
 }
 
 // ============================================================
@@ -668,15 +818,6 @@ function htmlToPlain(html) {
         .replace(/\n{3,}/g, '\n\n')
         .trim();
 }
-let toastTimer = null;
-function showToast(msg) {
-    const toast = document.getElementById('toast');
-    toast.textContent = msg;
-    toast.classList.add('show');
-    if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
-}
-
 // ============================================================
 // START
 // ============================================================
