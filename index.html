@@ -36,7 +36,8 @@
         box-shadow: 0 8px 32px rgba(0,0,0,0.5);
         overflow: auto;
         position: relative;
-        height: 720px;
+        height: calc(100vh - 200px);
+        min-height: 480px;
     }
     .timeline-wrap::-webkit-scrollbar { width: 12px; height: 12px; }
     .timeline-wrap::-webkit-scrollbar-track {
@@ -69,23 +70,42 @@
         position: absolute;
         left: 0;
         width: 100%;
-        padding: 4px 10px 0 8px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding: 0 12px 0 8px;
         font-size: 0.7rem;
         color: #9ca3af;
-        border-top: 1px dashed #3a3a5e;
         white-space: nowrap;
-        text-align: right;
+    }
+    .axis-tick-v::after {
+        content: '';
+        position: absolute;
+        right: 0; top: 50%;
+        width: 6px;
+        border-top: 1px solid #4a4a6e;
     }
     .axis-tick-v.timeless {
         color: #c4b5fd;
         font-style: italic;
+    }
+    .axis-break {
+        position: absolute;
+        left: 0;
+        width: 100%;
+        padding-right: 12px;
+        text-align: right;
+        font-size: 0.6rem;
+        color: #6b7280;
+        white-space: nowrap;
+        overflow: hidden;
     }
 
     /* ---- Canvas mit Gruppen & Items ---- */
     .canvas-v {
         position: relative;
         flex: 1;
-        min-width: 800px;
+        min-width: 0;
         /* Höhe wird dynamisch gesetzt */
     }
 
@@ -161,8 +181,11 @@
         top: 0; left: 0;
         pointer-events: none;
         z-index: 1;
-        width: 100%;
     }
+    .arrows-v .conn { transition: opacity 0.15s; }
+    .arrows-v.has-hl .conn { opacity: 0.12; }
+    .arrows-v.has-hl .conn.active { opacity: 1; }
+    .arrows-v .conn.active path { stroke-opacity: 1; stroke-width: 2.4; }
 
     /* ---- Tooltip & Toast ---- */
     .tooltip {
@@ -241,16 +264,21 @@
 const CONFIG = {
     sheetUrl: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRGtORIe7TdQLBiXK6qmWcoC-z-ixoYzMOwySVpKdj0mHxRtH769Hl_HNz6FCdL4u5NMLUPJcfQ3EvZ/pub?output=csv',
 
-    pxPerYear: 0.55,           // Höhe pro Jahr
-    minItemHeight: 44,         // Mindesthöhe eines Items
-    columnWidth: 240,          // Breite eines Items
-    columnGap: 12,             // Abstand zwischen Sub-Spalten
-    canvasPaddingTop: 30,      // Platz oben
-    canvasPaddingBottom: 60,   // Platz unten
-    groupHeaderHeight: 38,     // Höhe des Gruppen-Headers
-    groupHeaderPadding: 20,    // Abstand zwischen Header und erstem Item
-    timelessThreshold: -11500,
-    tickInterval: 500,
+    itemHeight: 40,            // feste Höhe eines Items
+    itemWidth: 320,            // Breite eines Items
+    itemX: 24,                 // linker Rand der Items
+    itemGap: 12,               // Abstand zwischen Items (Platz für kurze Pfeile)
+    groupHeaderHeight: 32,     // Höhe des Gruppen-Headers
+    groupHeaderGap: 8,         // Abstand Header → erstes Item
+    groupGap: 16,              // Abstand zwischen Gruppen
+    canvasPaddingTop: 12,
+    canvasPaddingBottom: 24,
+    bigGapYears: 1000,         // ab diesem Zeitsprung erscheint ein Marker auf der Achse
+    bigGapExtra: 14,           // zusätzlicher Platz für den Marker
+    laneOffset: 20,            // Abstand der ersten Pfeil-Spur zu den Items
+    laneSpacing: 9,            // Abstand zwischen Pfeil-Spuren
+    cornerRadius: 7,           // Rundung der Pfeil-Ecken
+    timelessThreshold: -11500, // Items davor gelten als "Zeitlos"
 };
 
 // ============================================================
@@ -317,7 +345,7 @@ async function loadData() {
     const rows = parseCSV(csv);
     if (rows.length < 2) throw new Error('Keine Daten im Sheet');
 
-    return rows.slice(1)
+    const parsed = rows.slice(1)
         .filter(r => r[0] && r[0].trim())
         .map(r => ({
             gruppe: (r[0] || '').trim(),
@@ -332,18 +360,36 @@ async function loadData() {
             tooltip: (r[9] || '').trim(),
         }))
         .filter(r => !isNaN(r.start) && r.id);
+
+    if (!parsed.length) throw new Error('Keine gültigen Zeilen im Sheet');
+    return parsed;
 }
 
 // ============================================================
 // RENDER
 // ============================================================
-function render(data) {
-    const startYear = Math.min(...data.map(d => d.start));
-    const endYear   = Math.max(...data.map(d => d.end || d.start));
-    const rangeStart = Math.floor((startYear - 400) / 500) * 500;
-    const rangeEnd   = Math.ceil((endYear + 300) / 500) * 500;
-    const totalYears = rangeEnd - rangeStart;
+function formatYear(y) {
+    const n = Math.abs(y).toLocaleString('de-DE');
+    return y < 0 ? n + ' BDP' : n + ' ADP';
+}
 
+// Farbe Richtung Weiß mischen, damit Pfeile auf dunklem Grund sichtbar bleiben
+function lighten(color, amount) {
+    const m = /^#([0-9a-f]{6})/i.exec(color || '');
+    if (!m) return '#b0b0b0';
+    const n = parseInt(m[1], 16);
+    const mix = c => Math.round(c + (255 - c) * amount);
+    const r = mix((n >> 16) & 255), g = mix((n >> 8) & 255), b = mix(n & 255);
+    return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
+function svgEl(name, attrs) {
+    const el = document.createElementNS('http://www.w3.org/2000/svg', name);
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+}
+
+function render(data) {
     const axisV = document.getElementById('axisV');
     const canvasV = document.getElementById('canvasV');
     const arrowsV = document.getElementById('arrowsV');
@@ -355,195 +401,200 @@ function render(data) {
     itemsLayer.innerHTML = '';
     arrowsV.innerHTML = '';
 
-    // Höhe berechnen
-    const rangeHeight = totalYears * CONFIG.pxPerYear;
-    const totalHeight = rangeHeight + CONFIG.canvasPaddingTop + CONFIG.canvasPaddingBottom;
-
-    axisV.style.height = totalHeight + 'px';
-    canvasV.style.height = totalHeight + 'px';
-    arrowsV.setAttribute('height', totalHeight);
-    arrowsV.setAttribute('viewBox', `0 0 800 ${totalHeight}`);
-    arrowsV.style.height = totalHeight + 'px';
-
-    // Achse
-    for (let y = rangeStart; y <= rangeEnd; y += CONFIG.tickInterval) {
-        const yPos = CONFIG.canvasPaddingTop + (y - rangeStart) * CONFIG.pxPerYear;
-        const tick = document.createElement('div');
-        tick.className = 'axis-tick-v';
-
-        const isTimeless = y < CONFIG.timelessThreshold;
-        if (isTimeless) {
-            tick.classList.add('timeless');
-            tick.textContent = 'Zeitlos';
-        } else if (y < 0) {
-            tick.textContent = Math.abs(y) + ' BDP';
-        } else {
-            tick.textContent = y + ' ADP';
-        }
-
-        tick.style.top = yPos + 'px';
-        axisV.appendChild(tick);
-    }
-
-    // Gruppen in Reihenfolge
-    const groupOrder = [];
+    // ──────────────────────────────────────────────────
+    // Gruppen bilden – Zeitlos immer zuerst
+    // ──────────────────────────────────────────────────
     const groupMap = {};
+    const groupOrder = [];
     for (const item of data) {
-        if (!groupMap[item.gruppe]) {
-            groupMap[item.gruppe] = [];
-            groupOrder.push(item.gruppe);
-        }
+        if (!groupMap[item.gruppe]) { groupMap[item.gruppe] = []; groupOrder.push(item.gruppe); }
         groupMap[item.gruppe].push(item);
     }
+    const groups = groupOrder.map(name => {
+        const items = groupMap[name].slice().sort((a, b) => a.start - b.start);
+        const timeless = /zeitlos/i.test(name) || items.every(i => i.start < CONFIG.timelessThreshold);
+        return { name, items, timeless };
+    });
+    groups.sort((a, b) => (b.timeless ? 1 : 0) - (a.timeless ? 1 : 0));   // stabil
 
     // ──────────────────────────────────────────────────
-    // Y-Position jedes Items berechnen
+    // Kompaktes Layout: Items der Reihe nach stapeln
     // ──────────────────────────────────────────────────
-    const sorted = [...data].sort((a, b) => a.start - b.start);
-    const itemY = {};   // id -> {y, h}
-    for (const item of sorted) {
-        const y = CONFIG.canvasPaddingTop + (item.start - rangeStart) * CONFIG.pxPerYear;
-        const h = Math.max(((item.end || item.start) - item.start) * CONFIG.pxPerYear, CONFIG.minItemHeight);
-        itemY[item.id] = { y, h };
-    }
+    const C = CONFIG;
+    const pos = {};              // id -> {x, y, w, h, item, row, group}
+    const axisEntries = [];      // Achsen-Labels
+    const breaks = [];           // Zeitsprung-Marker
+    let y = C.canvasPaddingTop;
+    let prevStart = null;
+    let row = 0;
 
-    // ──────────────────────────────────────────────────
-    // Gruppen-Header positionieren (jeweils über dem ersten Item der Gruppe)
-    // ──────────────────────────────────────────────────
-    const groupHeaderY = {};
-    let lastBottom = 0;
-
-    for (const groupName of groupOrder) {
-        const items = groupMap[groupName].slice().sort((a, b) => a.start - b.start);
-        const firstItem = items[0];
-        let headerY = itemY[firstItem.id].y - CONFIG.groupHeaderHeight - 8;
-
-        // Nicht mit vorheriger Gruppe überlappen
-        if (headerY < lastBottom + 4) {
-            headerY = lastBottom + 4;
+    groups.forEach((g, gi) => {
+        if (gi > 0) {
+            let gap = C.groupGap;
+            if (!g.timeless && prevStart !== null) {
+                const years = g.items[0].start - prevStart;
+                if (years >= C.bigGapYears) { gap += C.bigGapExtra; breaks.push({ y, h: gap, years }); }
+            }
+            y += gap;
         }
-        groupHeaderY[groupName] = headerY;
 
         const headerEl = document.createElement('div');
         headerEl.className = 'group-header-v';
-        headerEl.style.top = headerY + 'px';
-        headerEl.textContent = groupName;
+        headerEl.style.top = y + 'px';
+        headerEl.style.height = C.groupHeaderHeight + 'px';
+        headerEl.style.lineHeight = C.groupHeaderHeight + 'px';
+        headerEl.textContent = g.name;
         sectionsLayer.appendChild(headerEl);
+        if (g.timeless) axisEntries.push({ y, h: C.groupHeaderHeight, label: 'Zeitlos', timeless: true });
+        y += C.groupHeaderHeight + C.groupHeaderGap;
 
-        // Letzte Item-Unterkante der Gruppe finden
-        let groupBottom = headerY + CONFIG.groupHeaderHeight + CONFIG.groupHeaderPadding;
-        for (const item of items) {
-            const b = itemY[item.id].y + itemY[item.id].h;
-            if (b > groupBottom) groupBottom = b;
-        }
-        lastBottom = groupBottom;
+        g.items.forEach((item, idx) => {
+            if (idx > 0) {
+                let gap = C.itemGap;
+                if (!g.timeless) {
+                    const years = item.start - prevStart;
+                    if (years >= C.bigGapYears) { gap += C.bigGapExtra; breaks.push({ y, h: gap, years }); }
+                }
+                y += gap;
+            }
+            pos[item.id] = { x: C.itemX, y, w: C.itemWidth, h: C.itemHeight, item, row: row++, group: gi };
+            if (!g.timeless) axisEntries.push({ y, h: C.itemHeight, label: formatYear(item.start) });
+            y += C.itemHeight;
+            if (!g.timeless) prevStart = item.start;
+        });
+    });
+
+    const totalHeight = y + C.canvasPaddingBottom;
+    axisV.style.height = totalHeight + 'px';
+    canvasV.style.height = totalHeight + 'px';
+
+    // Achse
+    for (const e of axisEntries) {
+        const tick = document.createElement('div');
+        tick.className = 'axis-tick-v' + (e.timeless ? ' timeless' : '');
+        tick.style.top = e.y + 'px';
+        tick.style.height = e.h + 'px';
+        tick.textContent = e.label;
+        axisV.appendChild(tick);
     }
-
-    // ──────────────────────────────────────────────────
-    // Sub-Spalten (Overlap-Vermeidung)
-    // ──────────────────────────────────────────────────
-    const columnEnds = [];
-    const itemColumn = {};
-    for (const item of sorted) {
-        const { y, h } = itemY[item.id];
-        let col = 0;
-        for (; col < columnEnds.length; col++) {
-            if (columnEnds[col] + 6 <= y) break;
-        }
-        if (col === columnEnds.length) columnEnds.push(0);
-        columnEnds[col] = y + h;
-        itemColumn[item.id] = col;
-    }
-
-    const canvasWidth = Math.max(
-        CONFIG.columnWidth * columnEnds.length + CONFIG.columnGap * (columnEnds.length - 1) + 60,
-        800
-    );
-    canvasV.style.minWidth = canvasWidth + 'px';
-    arrowsV.setAttribute('width', canvasWidth);
-    arrowsV.setAttribute('viewBox', `0 0 ${canvasWidth} ${totalHeight}`);
-
-    const itemX = {};
-    for (const item of sorted) {
-        const col = itemColumn[item.id];
-        itemX[item.id] = 30 + col * (CONFIG.columnWidth + CONFIG.columnGap);
+    for (const b of breaks) {
+        const el = document.createElement('div');
+        el.className = 'axis-break';
+        el.style.top = b.y + 'px';
+        el.style.height = b.h + 'px';
+        el.style.lineHeight = b.h + 'px';
+        el.textContent = '⋮ ' + b.years.toLocaleString('de-DE') + ' J.';
+        axisV.appendChild(el);
     }
 
     // ──────────────────────────────────────────────────
     // Items zeichnen
     // ──────────────────────────────────────────────────
-    const itemPositions = {};
-    for (const item of sorted) {
-        const { y, h } = itemY[item.id];
-        const x = itemX[item.id];
-        const w = CONFIG.columnWidth;
-
+    for (const id in pos) {
+        const p = pos[id];
         const el = document.createElement('div');
         el.className = 'item-v';
-        el.style.left = x + 'px';
-        el.style.top = y + 'px';
-        el.style.width = w + 'px';
-        el.style.height = h + 'px';
-        el.style.background = item.farbe;
-        el.dataset.id = item.id;
-
+        el.style.left = p.x + 'px';
+        el.style.top = p.y + 'px';
+        el.style.width = p.w + 'px';
+        el.style.height = p.h + 'px';
+        el.style.background = p.item.farbe;
+        el.dataset.id = id;
         el.innerHTML =
-            '<div class="item-zeit">' + escapeHtml(item.icon + ' ' + item.zeit) + '</div>' +
-            '<div class="item-titel">' + escapeHtml(item.titel) + '</div>';
-
+            '<div class="item-zeit">' + escapeHtml(p.item.icon + ' ' + p.item.zeit) + '</div>' +
+            '<div class="item-titel">' + escapeHtml(p.item.titel) + '</div>';
         itemsLayer.appendChild(el);
-
-        itemPositions[item.id] = { x, y, w, h, item };
     }
+
+    // ──────────────────────────────────────────────────
+    // Verbindungen sammeln
+    // ──────────────────────────────────────────────────
+    const straight = [];   // direkter Nachfolger direkt darunter
+    const lane = [];       // alles andere: Spur rechts neben den Items
+    for (const id in pos) {
+        const s = pos[id];
+        for (const targetId of s.item.deps) {
+            const d = pos[targetId];
+            if (!d || d === s) continue;
+            const conn = { src: id, dst: targetId, color: lighten(s.item.farbe, 0.4) };
+            if (d.row === s.row + 1 && d.group === s.group) straight.push(conn);
+            else lane.push(conn);
+        }
+    }
+
+    // Anschlusspunkte an der rechten Kante verteilen (mehrere Pfeile pro Item)
+    const ports = {};
+    for (const c of lane) {
+        (ports[c.src] = ports[c.src] || []).push({ c, key: 'y1', other: pos[c.dst].y });
+        (ports[c.dst] = ports[c.dst] || []).push({ c, key: 'y2', other: pos[c.src].y });
+    }
+    for (const id in ports) {
+        const arr = ports[id].sort((a, b) => a.other - b.other);
+        const p = pos[id];
+        const n = arr.length;
+        const step = n > 1 ? Math.min(5, (p.h - 14) / (n - 1)) : 0;
+        arr.forEach((pt, i) => { pt.c[pt.key] = p.y + p.h / 2 + (i - (n - 1) / 2) * step; });
+    }
+
+    // Spuren vergeben: kurze Verbindungen innen, lange außen
+    lane.sort((a, b) => Math.abs(a.y1 - a.y2) - Math.abs(b.y1 - b.y2));
+    const laneUse = [];
+    for (const c of lane) {
+        const lo = Math.min(c.y1, c.y2), hi = Math.max(c.y1, c.y2);
+        let k = 0;
+        for (;; k++) {
+            const used = laneUse[k] = laneUse[k] || [];
+            if (used.every(([l, h]) => hi + 6 < l || lo - 6 > h)) { used.push([lo, hi]); break; }
+        }
+        c.lane = k;
+    }
+
+    const maxLane = lane.reduce((m, c) => Math.max(m, c.lane), -1);
+    const canvasWidth = C.itemX + C.itemWidth + C.laneOffset + (maxLane + 1) * C.laneSpacing + 40;
+    canvasV.style.minWidth = canvasWidth + 'px';
+    arrowsV.style.width = canvasWidth + 'px';
+    arrowsV.style.height = totalHeight + 'px';
+    arrowsV.setAttribute('width', canvasWidth);
+    arrowsV.setAttribute('height', totalHeight);
+    arrowsV.setAttribute('viewBox', `0 0 ${canvasWidth} ${totalHeight}`);
 
     // ──────────────────────────────────────────────────
     // Pfeile zeichnen
     // ──────────────────────────────────────────────────
-    let arrowIndex = 0;
-    for (const id in itemPositions) {
-        const src = itemPositions[id];
-        for (const targetId of src.item.deps) {
-            const dst = itemPositions[targetId];
-            if (!dst) continue;
+    const HEAD = 7;
+    function addConn(c, d, headPoints, startDot) {
+        const g = svgEl('g', { class: 'conn' });
+        g.dataset.src = c.src;
+        g.dataset.dst = c.dst;
+        g.appendChild(svgEl('path', {
+            d, fill: 'none', stroke: c.color, 'stroke-opacity': '0.6',
+            'stroke-width': '1.7', 'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+        }));
+        g.appendChild(svgEl('polygon', { points: headPoints, fill: c.color, 'fill-opacity': '0.9' }));
+        if (startDot) g.appendChild(svgEl('circle', { cx: startDot[0], cy: startDot[1], r: 2.2, fill: c.color, 'fill-opacity': '0.9' }));
+        arrowsV.appendChild(g);
+    }
 
-            const color = ARROW_COLORS[arrowIndex % ARROW_COLORS.length];
-            arrowIndex++;
+    for (const c of straight) {
+        const s = pos[c.src], d = pos[c.dst];
+        const x = s.x + s.w / 2;
+        const y1 = s.y + s.h, y2 = d.y;
+        const h = Math.min(HEAD - 1, (y2 - y1) - 2);
+        addConn(c, `M ${x} ${y1} L ${x} ${y2 - h}`,
+            `${x},${y2} ${x - 3.5},${y2 - h} ${x + 3.5},${y2 - h}`, [x, y1]);
+    }
 
-            // Von Unterkante Quelle → Oberkante Ziel
-            const x1 = src.x + src.w / 2;
-            const y1 = src.y + src.h;
-            const x2 = dst.x + dst.w / 2;
-            const y2 = dst.y;
-
-            const dy = y2 - y1;
-            let pathD;
-
-            if (dy > 10) {
-                // Nach unten – Kurve
-                const cy = y1 + dy * 0.5;
-                pathD = `M ${x1} ${y1} C ${x1} ${cy}, ${x2} ${cy}, ${x2} ${y2}`;
-            } else {
-                // Rückwärts / gleiche Höhe – Bogen
-                const midX = (x1 + x2) / 2 + (x2 > x1 ? 60 : -60);
-                pathD = `M ${x1} ${y1} Q ${midX} ${(y1 + y2) / 2 + 30}, ${x2} ${y2}`;
-            }
-
-            const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            p.setAttribute('d', pathD);
-            p.setAttribute('fill', 'none');
-            p.setAttribute('stroke', color);
-            p.setAttribute('stroke-width', '1.6');
-            p.setAttribute('stroke-linecap', 'round');
-            arrowsV.appendChild(p);
-
-            // Pfeilspitze (zeigt nach unten)
-            const size = 7;
-            const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-            arrow.setAttribute('points',
-                `${x2},${y2} ${x2 - size/2},${y2 - size} ${x2 + size/2},${y2 - size}`);
-            arrow.setAttribute('fill', color);
-            arrowsV.appendChild(arrow);
-        }
+    for (const c of lane) {
+        const s = pos[c.src], d = pos[c.dst];
+        const x0 = s.x + s.w;
+        const laneX = x0 + C.laneOffset + c.lane * C.laneSpacing;
+        const dir = c.y2 > c.y1 ? 1 : -1;
+        const r = Math.max(1, Math.min(C.cornerRadius, Math.abs(c.y2 - c.y1) / 2, laneX - x0 - HEAD - 1));
+        const dPath =
+            `M ${x0} ${c.y1} H ${laneX - r} Q ${laneX} ${c.y1} ${laneX} ${c.y1 + dir * r} ` +
+            `V ${c.y2 - dir * r} Q ${laneX} ${c.y2} ${laneX - r} ${c.y2} H ${x0 + HEAD}`;
+        addConn(c, dPath,
+            `${x0},${c.y2} ${x0 + HEAD},${c.y2 - 3.5} ${x0 + HEAD},${c.y2 + 3.5}`, [x0, c.y1]);
     }
 
     // Interaktion
@@ -555,10 +606,14 @@ function render(data) {
 // ============================================================
 function attachInteractions(data) {
     const tooltip = document.getElementById('tooltip');
+    const arrows = document.getElementById('arrowsV');
 
     document.querySelectorAll('.item-v').forEach(el => {
         el.addEventListener('mouseenter', (e) => {
             const id = el.dataset.id;
+            arrows.classList.add('has-hl');
+            arrows.querySelectorAll('.conn').forEach(g =>
+                g.classList.toggle('active', g.dataset.src === id || g.dataset.dst === id));
             const item = data.find(d => d.id === id);
             if (!item) return;
             tooltip.innerHTML = item.tooltip;
@@ -567,6 +622,7 @@ function attachInteractions(data) {
         });
         el.addEventListener('mousemove', positionTooltip);
         el.addEventListener('mouseleave', () => {
+            arrows.classList.remove('has-hl');
             tooltip.style.display = 'none';
         });
         el.addEventListener('click', () => {
@@ -634,7 +690,8 @@ function showToast(msg) {
     } catch (err) {
         console.error(err);
         status.classList.add('error');
-        status.textContent = '❌ Fehler beim Laden: ' + err.message;
+        status.textContent = '⚠️ Laden fehlgeschlagen (' + err.message + ') – Demo-Daten werden angezeigt.';
+        render(DEMO_DATA);
     }
 })();
 </script>
