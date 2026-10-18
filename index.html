@@ -142,10 +142,10 @@
     .group-header-v {
         position: absolute;
         border-style: solid;
-        border-width: 0 16px;
+        border-width: 14px 16px;
         border-image-source: var(--tex-plate-silver);
-        border-image-slice: 0 16 fill;
-        border-image-width: 0 16px;
+        border-image-slice: 14 16 fill;
+        border-image-width: 14px 16px;
         border-image-repeat: stretch;
         padding: 0 4px;
         text-align: center;
@@ -319,7 +319,7 @@ const CONFIG = {
     itemWidth: 420,            // Breite eines Items
     itemX: 24,                 // linker Rand der Items
     itemGap: 12,               // Abstand zwischen Items (Platz für kurze Pfeile)
-    groupHeaderHeight: 38,     // Höhe des Gruppen-Headers (Titelplatte)
+    groupHeaderHeight: 57,     // Höhe des Gruppen-Headers (Titelplatte)
     groupHeaderGap: 8,         // Abstand Header → erstes Item
     groupGap: 16,              // Abstand zwischen Gruppen
     canvasPaddingTop: 12,
@@ -742,7 +742,7 @@ function render(data) {
         el.style.left = (C.itemX - 4) + 'px';
         el.style.width = (C.itemWidth + 8) + 'px';
         el.style.height = C.groupHeaderHeight + 'px';
-        el.style.lineHeight = C.groupHeaderHeight + 'px';
+        el.style.lineHeight = (C.groupHeaderHeight - 28) + 'px';   // 2 × 14 px Plattenrand
         el.textContent = h.name;
         sectionsLayer.appendChild(el);
         els.headers.push(el);
